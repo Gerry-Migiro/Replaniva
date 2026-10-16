@@ -2,41 +2,66 @@
 
 **Plans that adapt when life changes.**
 
-Replaniva is intended to become a personal planning secretary for anyone managing tasks, commitments and disruptions: work, household responsibilities, study, caregiving and personal goals.
+Private personal planning for work, home, study, caregiving and personal goals.
 
-## Current stage
+## Stage 1: private planning foundation
 
-This repository currently contains the official Jac web-app starter, generated with Jac **0.37.25**. It is a small shared guestbook: Jac message nodes persist in the graph, public walkers post and list messages, and the web client renders them. It is not yet a private planner or an AI secretary. The generated application source is unchanged.
+- Create an account, sign in and keep your planning graph private.
+- Select a planning date and save your IANA timezone and daily planning hours.
+- Add, edit, complete, reopen and delete tasks with duration, importance and a due date/time.
+- Add, edit and remove fixed commitments. Overlapping commitments are rejected.
+- Saving rebuilds flexible work within planning hours, around fixed commitments, in deadline and importance order. Every resulting placement is validated. Work that cannot fit stays visible as **Unscheduled**.
 
-WhatsApp is outside the scope of this project. No WhatsApp code or dependencies are included.
+This stage plans each selected calendar day using local wall-clock minutes. It does not split work, optimize all possible schedules, account for DST transition elapsed-time differences, or automatically move unfinished work between dates. Commitments can be outside planning hours. Changing a timezone changes the interpretation of local times, not the saved clock values. Saving planning hours explicitly reschedules flexible work across saved days.
 
-## Setup
+Recovery proposals, assistant chat, notifications, dependencies, goals, voice, CLI, mobile and external calendars are later stages. WhatsApp is outside this project's scope.
 
-Install Jac 0.37.25 using the [official installation instructions](https://www.jac-lang.org/quick-guide/install/). The [official release](https://github.com/jaseci-labs/jac/releases/tag/v0.37.25) provides the native binary. The project pins that exact version in `jac.toml`. Jac is supplied by the native toolchain, not an outdated PyPI package.
+## Run locally
+
+Use the [official Jac 0.37.25 release](https://github.com/jaseci-labs/jac/releases/tag/v0.37.25). The exact version is pinned in `jac.toml`.
 
 ```bash
 jac --version
 jac install
 jac check
+jac test planning.jac
 jac run --dev --host 127.0.0.1 --port 8100 --api-port 8101
 ```
 
-Open http://localhost:8100. The API uses port 8101. The non-default ports let another local application keep using 8000/8001. With no conflicting service, ordinary `jac run` uses Jac's default ports.
+Open **http://localhost:8100**. The API uses port **8101**. These ports let another local application keep using 8000/8001. When multiple Jac installations exist, use the explicit binary path or configure PATH to select 0.37.25 first.
 
-Use only sample text in this starter: its generated public guestbook walkers share a global root and do not provide private per-account storage.
+Create an account through the sign-in screen. In **Hours**, use the browser timezone or enter a valid IANA name, then save. Add a commitment and a task to see the saved schedule. No model key or external calendar credentials are needed.
 
-## Starter files
+Jac provisions local persistent graph and identity storage. Keep its runtime directory private and out of Git; preserve the database when restarting. There is no account-data import from the older prototype. Password recovery and email verification are not configured at this stage.
 
-- `main.jac`: full-stack entry point.
-- `endpoints.jac`: message node and post/list walkers.
-- `frontend.jac` and `frontend.impl.jac`: guestbook UI and handlers.
-- `components/MessageCard.jac`: message presentation.
-- `jac.toml`: toolchain pin and generated dependencies.
+## Verification
 
-## Provenance and event eligibility
+`jac test planning.jac` checks constraints, impossible work, conflicts, duplicate and unknown placements, exact-minute gaps and priority ordering. `jac check` may emit generated-state-setter warnings and explicit dynamic browser-boundary warnings; a passing check is not a warning-free claim.
 
-An earlier Replaniva prototype exists separately and predates this repository. This repository's initial application source comes from the official Jac scaffolder, not copied prototype features. Any later reuse must be disclosed honestly; new commit timestamps do not establish when reused source was first written. Competition eligibility, including permission to reuse earlier implementation and templates, must be confirmed with the organizers. No eligibility claim is made by this setup.
+`tests/stage1.cjs` exercises the browser and API together: task and commitment management, settings, authentication enforcement, foreign-account IDs, invalid inputs, refresh persistence, sign-out and responsive widths. It replaces fixtures on the selected day of a **dedicated reusable QA account**, never an owner's account. Create that account once through the UI. A temporary isolation account is removed through the local admin API after its checks.
 
-## Hosting target
+The script needs Playwright with Firefox installed, plus these environment variables:
 
-[Jac Hammer](https://jachammer.ai/) is the intended deployment target. Its official site supports importing a repository for deployment. This initial stage has not been deployed there, and platform compatibility remains a verification step after the repository is pushed. No deployed URL is claimed.
+```bash
+export REPLANIVA_TEST_EMAIL='your-dedicated-qa-account@example.test'
+# Configure REPLANIVA_TEST_PASSWORD and REPLANIVA_ADMIN_PASSWORD privately.
+node tests/stage1.cjs
+```
+
+Optional overrides: `PLAYWRIGHT_MODULE` (module path), `FIREFOX_PATH` (browser binary), `REPLANIVA_UI`, `REPLANIVA_API` and `REPLANIVA_ADMIN_USERNAME`. Install browser dependencies through your normal Playwright setup. Do not run the fixture test against production. Browser screenshots go to `/tmp/replaniva-stage1-*.png`.
+
+## Structure
+
+- `main.jac`: application entry and stylesheet.
+- `endpoints.jac`: typed protected operations, owned graph storage and input validation.
+- `planning.jac`: deterministic scheduling, placement validation and tests.
+- `frontend.jac`: authentication, capture, planning settings and saved schedule.
+- `planner.css`: responsive graphite and orange interface.
+
+CRUD uses protected functions. A traversal walker belongs in the later investigation stage, where it will follow actual planning relationships.
+
+## Provenance and hosting
+
+The initial commit used the official Jac web-app guestbook scaffold. Stage 1 replaces that sample with planning code written for this repository, informed by the earlier Replaniva product concepts. The earlier prototype remains separate. Its feature implementation, accounts, credentials and WhatsApp code have not been copied here. Organizer permission for reuse, template eligibility and any competition compliance claims must be established separately; commit timestamps alone do not prove eligibility.
+
+[Jac Hammer](https://jachammer.ai/) is the intended hosting target. This stage has been tested locally, not deployed there. Before exposing a hosted instance, configure administrative credentials, production authentication and persistent storage, then verify the deployment.
