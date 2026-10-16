@@ -68,7 +68,7 @@ def simulate_what_if_event(title: str, start: int, end: int, work: list[Work], b
     new_busy = [b for b in busy];
     new_busy.append(Busy(title=title, start=start, end=end));
     new_choice = make_choice("minimal", work, new_busy, day_start, day_end);
-    
+
     affected_tasks: list[str] = [];
     for new_slot in new_choice.slots {
         original_slots = [s for s in original_choice.slots if s.task_id == new_slot.task_id];
@@ -87,10 +87,10 @@ def simulate_what_if_event(title: str, start: int, end: int, work: list[Work], b
             }
         }
     }
-    
+
     slack_change = -(end - start);
     unplaced_count = len(new_choice.unplaced) - len(original_choice.unplaced);
-    
+
     return CommandProposal(
         kind="what_if",
         title="What if: " + title,
@@ -404,7 +404,7 @@ def capture_command(context: CommandContext) -> CommandReply | None {
             if w.lower() in ["find", "me", "add", "schedule", "for", "task", "hours", "hour", "min", "mins", "minutes", "minute", "time"] { continue; }
             if w.istitle() and not w.isdigit() { title = w; break; }
         }
-        
+
         prop = CommandProposal(
             kind="create_task",
             title="Create Task: " + title,
