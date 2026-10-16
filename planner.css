@@ -3,3 +3,5 @@
 .due-row{grid-template-columns:minmax(0,1fr) minmax(100px,.7fr)}
 @media(min-width:701px) and (max-width:1000px){.due-row{grid-template-columns:1fr}}
 .due-row input{font-size:14px;padding-inline:8px}
+@media(min-width:1001px){.due-row{grid-template-columns:1fr 1fr}}
+@media(max-width:400px){.due-row{grid-template-columns:1fr}}
