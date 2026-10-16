@@ -1,0 +1,13 @@
+.jac/
+node_modules/
+.vscode/
+.idea/
+
+# Private configuration and generated runtime output
+.env
+.env.*
+!.env.example
+__pycache__/
+*.pyc
+*.log
+.DS_Store
