@@ -30,3 +30,37 @@ watchdog = ">=3.0.0"
 
 
 [client]
+
+[dependencies.pypi]
+cryptography = ">=41.0.0"
+
+[client.assets]
+dir = "assets"
+
+[client.app_meta_data]
+title = "Replaniva | Plans that adapt when life changes"
+description = "A private personal planner with reviewable recovery when the day changes."
+theme_color = "#171717"
+icon = "/static/assets/replaniva-favicon.png"
+
+[scale.admin]
+enabled = false
+
+[scale.scheduler]
+enabled = true
+
+[serve.access_log]
+enabled = false
+
+[serve.websocket]
+allowed_origins = ["http://localhost:8100", "http://127.0.0.1:8100"]
+
+[placement.pins]
+"endpoints" = "server"
+"ai" = "server"
+"secretary" = "server"
+"secretary_ai" = "server"
+"secretary_runtime" = "server"
+
+[byllm.model]
+default_model = "gemini/gemini-2.5-flash"
