@@ -1018,6 +1018,14 @@ def:protect restore_revision(revision_id: str) -> Action {
             if revision.version != prefs.version {
                 return Action(ok=False, message="Only the latest unchanged recovery can be restored.");
             }
+            remaining_busy = [Busy(title=c.title, start=c.start, end=c.end)
+                              for c in [root -->][?:Commitment]
+                              if c.day == revision.day and jid(c) != revision.commitment_id];
+            placed_before = [slot for slot in revision.before if slot.start >= 0];
+            if not validate(placed_before, work_for(revision.day), remaining_busy,
+                            planning_start(revision.day, prefs), prefs.day_end) {
+                return Action(ok=False, message="The previous plan is no longer valid at the current time. Your current plan was not changed.");
+            }
             for commitment in [root -->][?:Commitment] {
                 if jid(commitment) == revision.commitment_id { del commitment; }
             }
@@ -1780,6 +1788,110 @@ test "activity retention limits history without touching plans or other owners" 
         context.set_user_root(original);
         Jac.disconnect(root, first); Jac.disconnect(root, second);
         context.mem.delete(UUID(jid(first))); context.mem.delete(UUID(jid(second)));
+        Jac.commit(); Jac.set_shared_root_resolver(None);
+    }
+}
+
+test "recovery preview approval isolation and restore preserve the saved plan" {
+    import from jaclang { JacRuntime as Jac }
+    import from jaclang.runtime.archetype { Root }
+    import from uuid { UUID }
+    original = jid(root);
+    context = Jac.get_context();
+    first = root ++> Root(); second = root ++> Root();
+    Jac.save(first); Jac.save(second); Jac.commit();
+    Jac.set_shared_root_resolver(lambda -> str { return original; });
+    day = "2099-01-01";
+    try {
+        context.set_user_root(jid(first));
+        prefs = root ++> Settings();
+        task = root ++> Task(title="Prepare project brief", day=day,
+                            duration=60, deadline=1200, start=480);
+        blocked = root ++> Task(title="Long project", day=day,
+                               duration=900, deadline=1200, start=-1);
+        assert preview_recovery("Team meeting", day, 480, 540).ok;
+        proposal = [p for p in [root -->][?:Proposal] if p.active][0];
+        assert task.start == 480 and blocked.start == -1;
+        assert len([root -->][?:Commitment]) == 0 and prefs.version == 0;
+        assert validate(proposal.minimal.slots, work_for(day),
+                        [Busy(title="Team meeting", start=480, end=540)], 480, prefs.day_end);
+        assert validate(proposal.deadline.slots, work_for(day),
+                        [Busy(title="Team meeting", start=480, end=540)], 480, prefs.day_end);
+        assert jid(blocked) in proposal.minimal.unplaced;
+        context.set_user_root(jid(second));
+        assert not accept_recovery(jid(proposal), "minimal").ok;
+        assert not dismiss_recovery(jid(proposal)).ok;
+        assert len([root -->][?:Commitment]) == 0;
+        context.set_user_root(jid(first));
+        assert not accept_recovery(jid(proposal), "unknown").ok;
+        assert proposal.active and task.start == 480;
+        assert dismiss_recovery(jid(proposal)).ok;
+        assert not accept_recovery(jid(proposal), "minimal").ok;
+        assert task.start == 480 and prefs.version == 0;
+        assert preview_recovery("Team meeting", day, 480, 540).ok;
+        proposal = [p for p in [root -->][?:Proposal] if p.active][0];
+        assert accept_recovery(jid(proposal), "deadline").ok;
+        assert task.start >= 540 and blocked.start == -1;
+        assert len([root -->][?:Commitment]) == 1;
+        assert not accept_recovery(jid(proposal), "deadline").ok;
+        revision = [root -->][?:Revision][0];
+        context.set_user_root(jid(second));
+        assert not restore_revision(jid(revision)).ok;
+        context.set_user_root(jid(first));
+        assert restore_revision(jid(revision)).ok;
+        assert task.start == 480 and blocked.start == -1;
+        assert revision.restored and len([root -->][?:Commitment]) == 0;
+        assert not restore_revision(jid(revision)).ok;
+        assert preview_recovery("Outdated meeting", day, 480, 540).ok;
+        proposal = [p for p in [root -->][?:Proposal] if p.active][0];
+        prefs.version += 1;
+        assert not accept_recovery(jid(proposal), "minimal").ok;
+        assert task.start == 480 and len([root -->][?:Commitment]) == 0;
+        assert preview_recovery("Fresh meeting", day, 480, 540).ok;
+        proposal = [p for p in [root -->][?:Proposal] if p.active][0];
+        assert accept_recovery(jid(proposal), "minimal").ok;
+        revision = [r for r in [root -->][?:Revision] if not r.restored][0];
+        prefs.version += 1;
+        assert not restore_revision(jid(revision)).ok;
+        assert not revision.restored and len([root -->][?:Commitment]) == 1;
+    } finally {
+        for fixture in [first, second] {
+            context.set_user_root(jid(fixture));
+            for item in [root -->] { del item; }
+        }
+        context.set_user_root(original);
+        Jac.disconnect(root, first); Jac.disconnect(root, second);
+        context.mem.delete(UUID(jid(first))); context.mem.delete(UUID(jid(second)));
+        Jac.commit(); Jac.set_shared_root_resolver(None);
+    }
+}
+
+test "restore rejects a now infeasible schedule before deleting its commitment" {
+    import from jaclang { JacRuntime as Jac }
+    import from jaclang.runtime.archetype { Root }
+    import from uuid { UUID }
+    original = jid(root);
+    context = Jac.get_context();
+    owner = root ++> Root();
+    Jac.save(owner); Jac.commit();
+    Jac.set_shared_root_resolver(lambda -> str { return original; });
+    try {
+        context.set_user_root(jid(owner));
+        prefs = root ++> Settings();
+        task = root ++> Task(title="Project brief", day="2099-01-01", duration=60,
+                            deadline=1200, start=540);
+        commitment = root ++> Commitment(title="Team meeting", day="2099-01-01", start=480, end=540);
+        revision = root ++> Revision(day="2099-01-01", version=prefs.version,
+            title="Team meeting", before=[Slot(task_id=jid(task), start=450, end=510)],
+            commitment_id=jid(commitment));
+        assert not restore_revision(jid(revision)).ok;
+        assert task.start == 540 and not revision.restored and prefs.version == 0;
+        assert len([root -->][?:Commitment]) == 1;
+    } finally {
+        context.set_user_root(jid(owner));
+        for item in [root -->] { del item; }
+        context.set_user_root(original);
+        Jac.disconnect(root, owner); context.mem.delete(UUID(jid(owner)));
         Jac.commit(); Jac.set_shared_root_resolver(None);
     }
 }
