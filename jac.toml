@@ -67,7 +67,7 @@ enabled = true
 enabled = false
 
 [serve.websocket]
-allowed_origins = ["http://localhost:8100", "http://127.0.0.1:8100", "https://preview-jac-sbx-460bcc70e4f1459ea27552f5b0bd016a.jachammer.app"]
+allowed_origins = ["http://localhost:8100", "http://127.0.0.1:8100", "https://preview-jac-sbx-502b88fe495449528b3cd21fedf641ef.jachammer.app"]
 
 [placement.pins]
 "endpoints" = "server"
