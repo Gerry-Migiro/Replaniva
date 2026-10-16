@@ -2,14 +2,28 @@
 name = "Replaniva"
 version = "0.1.0"
 description = "An adaptive personal planning secretary for everyday life"
-entry-point = "main"
-kind = "web-app"
+default-app = "Replaniva"
 jac-version = "==0.37.25"
+
+[apps.Replaniva]
+kind = "web-app"
+entry-point = "main"
+route = "/"
+
+[apps.cli]
+kind = "cli"
+entry-point = "cli.main"
+
+[apps.mobile]
+kind = "mobile"
+entry-point = "mobile.main"
+platform = "android"
 
 [dependencies]
 [dependencies.npm]
 react = "^19.2.0"
 react-dom = "^19.2.0"
+react-native-web = "^0.19.13"
 react-router-dom = "^6.22.0"
 react-error-boundary = "^5.0.0"
 "@tanstack/react-form" = "^1.33.0"
@@ -53,7 +67,7 @@ enabled = true
 enabled = false
 
 [serve.websocket]
-allowed_origins = ["http://localhost:8100", "http://127.0.0.1:8100"]
+allowed_origins = ["http://localhost:8100", "http://127.0.0.1:8100", "https://preview-jac-sbx-460bcc70e4f1459ea27552f5b0bd016a.jachammer.app"]
 
 [placement.pins]
 "endpoints" = "server"
@@ -61,6 +75,8 @@ allowed_origins = ["http://localhost:8100", "http://127.0.0.1:8100"]
 "secretary" = "server"
 "secretary_ai" = "server"
 "secretary_runtime" = "server"
+"model_usage" = "server"
+"calendar_gateway" = "server"
 
 [byllm.model]
 default_model = "gemini/gemini-2.5-flash"

@@ -8,4 +8,4 @@ resolved = ["APScheduler==3.11.3", "Jinja2==3.1.6", "MarkupSafe==3.0.4", "PyYAML
 inputs = "sha256:525c005557f1ffb0b0ea236b0630200681575ce0397d2d0460efa3b1a3ba7bd2"
 
 [npm]
-bun_lock = "sha256:81d2498897ca9f88233b23025c4a3c5abcc22dc5f3c272b68f6de2cd500bf268"
+bun_lock = "sha256:992ab356c4ca053c20ad75877ba864a3306a5eea62ad854d5fc90734ecba56d7"

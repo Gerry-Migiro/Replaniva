@@ -40,6 +40,28 @@ The web app supports private accounts, dates, planning hours, tasks, fixed commi
 
 A task is due on its planning date unless you choose a later due date in Capture. The later date lets Replaniva assess a requested move to another day without pretending that a deadline has changed.
 
+## Terminal and mobile clients
+
+The terminal client shares the web account and planning API:
+
+```bash
+jac run cli -- login YOUR_USERNAME
+jac run cli -- today
+jac run cli -- ask "What is at risk?"
+jac run cli
+```
+
+The local API defaults to `http://127.0.0.1:8101`. Set `REPLANIVA_URL` to use another deployment. The guided menu supports capture, recovery review and explicit approval. Sign-in stores a private token on the device; `jac run cli -- logout` removes it.
+
+The mobile client uses the same protected planning operations and original mobile layouts:
+
+```bash
+jac run --dev --platform web mobile
+jac build mobile --platform web
+```
+
+Native Android packaging requires the Android SDK and a device or emulator. A browser build does not establish native Android verification.
+
 ## Recovery Studio
 
 Enter a disruption and its time, then choose **Explore recovery**. Previewing does not change saved tasks or add the commitment. Compare **Move as little as possible** and **Protect deadlines**, including work that cannot fit. Each option is checked against planning hours, fixed commitments, durations, deadlines and dependencies.
@@ -80,6 +102,9 @@ Google Calendar requires separate owner setup and consent. Live synchronization 
 - `secretary_ai.jac` provides bounded, metered read and simulation tools.
 - `secretary_runtime.jac` connects account-owned native scheduling and live updates.
 - `ai.jac` contains optional provider-backed recovery suggestions and disruption interpretation.
+- `model_usage.jac` enforces model allowances, private caching and provider cooldowns.
+- `calendar_gateway.jac` handles Calendar requests and encrypted OAuth storage.
+- `cli/main.jac` and `mobile/main.jac` provide terminal and mobile interfaces to the shared planning service.
 - `frontend.jac` coordinates web navigation and shared state. The `frontend_*` modules separate Settings, conversation, dialogs, recovery views, speech, live connection, tour and formatting.
 
 ## Verification
@@ -88,14 +113,14 @@ Google Calendar requires separate owner setup and consent. Live synchronization 
 jac check
 jac test planning.jac intelligence.jac assistant.jac accounts.jac account_clock.jac secretary_tests.jac model_provider_tests.jac
 jac test endpoints.jac
-.jac/venv/bin/python -m unittest test_model_usage test_calendar_gateway
+jac test test_model_usage.jac test_calendar_gateway.jac cli_tests.jac
 ```
 
 Model and Calendar tests use synthetic replies rather than live external calls. Compiler warnings remain visible.
 
 ## Hosting
 
-[Jac Hammer](https://jachammer.ai/) is the intended hosting target. Local testing does not establish hosted compatibility. Configure production authentication and persistent storage, then verify the hosted workflows. Keep secrets, runtime storage and caches out of Git. The bundled admin portal is disabled in `jac.toml`.
+The application is hosted on [Jac Hammer](https://preview-jac-sbx-460bcc70e4f1459ea27552f5b0bd016a.jachammer.app/). Configure production authentication and persistent storage, then verify the hosted workflows. Keep secrets, runtime storage and caches out of Git. The bundled admin portal is disabled in `jac.toml`.
 
 ## Dashboard appearance and visual assets
 
