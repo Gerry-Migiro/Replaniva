@@ -64,3 +64,10 @@ allowed_origins = ["http://localhost:8100", "http://127.0.0.1:8100"]
 
 [byllm.model]
 default_model = "gemini/gemini-2.5-flash"
+
+[jacpack]
+name = 'Replaniva'
+description = 'Jac IDE snapshot for Replaniva'
+
+[jachammer]
+project_id = "prj_14d504004a854974bf605144571f3dbb"
