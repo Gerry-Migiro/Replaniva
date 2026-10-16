@@ -1736,6 +1736,19 @@ def:protect secretary_live_ticket -> SecretaryLiveConnection {
 }
 
 
+test "account preferences do not change the plan version" {
+    prefs = Settings(version=7, tour_completed=False, light_mode=False);
+    prefs.tour_completed = True;
+    prefs.light_mode = True;
+    assert prefs.tour_completed and prefs.light_mode;
+    assert prefs.version == 7;
+}
+
+test "connection status exposes credential presence flags" {
+    status = ServerConnectionView(gemini_configured=False);
+    assert isinstance(status.gemini_configured, bool);
+}
+
 test "activity retention parses offsets and legacy timestamps" {
     assert activity_timestamp("2026-10-16T11:00:00Z", "Africa/Nairobi") == activity_timestamp("2026-10-16T14:00:00+03:00", "Africa/Nairobi");
     assert activity_timestamp("2026-10-16T14:00:00", "Africa/Nairobi") == activity_timestamp("2026-10-16T11:00:00Z", "Africa/Nairobi");
