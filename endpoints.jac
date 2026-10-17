@@ -914,9 +914,12 @@ def:protect preview_recovery(title: str, day: str = "", start: int = 840,
     schedule_start = planning_start(current_day, prefs);
     minimal = make_choice("minimal", work, busy, schedule_start, prefs.day_end);
     deadline = make_choice("deadline", work, busy, schedule_start, prefs.day_end);
+    model_feedback = "";
     if use_model {
         model_choice = optional_model_choice(work, busy, schedule_start, prefs.day_end, jid(root));
         if model_choice is not None { deadline = model_choice; }
+        elif not work { model_feedback = " No flexible tasks need a model-assisted schedule."; }
+        else { model_feedback = " Model assistance did not return a valid schedule. Both choices use deterministic Jac planning."; }
     }
     if not validate(minimal.slots, work, busy, schedule_start, prefs.day_end) or
        not validate(deadline.slots, work, busy, schedule_start, prefs.day_end) {
@@ -925,7 +928,7 @@ def:protect preview_recovery(title: str, day: str = "", start: int = 840,
     deactivate_proposals(current_day);
     root ++> Proposal(day=current_day, title=title.strip(), start=start, end=end,
                       base_version=prefs.version, minimal=minimal, deadline=deadline);
-    return Action(ok=True, message="Two recovery choices are ready to review.");
+    return Action(ok=True, message="Two recovery choices are ready to review." + model_feedback);
 }
 
 def:protect dismiss_recovery(proposal_id: str) -> Action {
@@ -946,6 +949,10 @@ def:protect interpret_disruption(note: str, day: str = "") -> DisruptionDraft {
     }
     draft = optional_interpret_note(note, resolved_day(day), jid(root));
     if draft is None {
+        model_state = usage_status(jid(root));
+        if model_state["paused"] {
+            return DisruptionDraft(ok=False, message="Model requests are temporarily paused after a provider error or rate limit. Try later, or enter the time fields below.");
+        }
         return DisruptionDraft(ok=False, message="AI interpretation is unavailable. Enter the change using the time fields below.");
     }
     return DisruptionDraft(ok=True, title=draft.title, start=draft.start,

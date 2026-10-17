@@ -43,7 +43,11 @@ sem PlanningModel.suggest.context = "Exact task IDs, durations, deadlines, curre
 sem PlanningModel.suggest.feedback = "Validation problems from the previous suggestion.";
 
 def model_runner(name: str) -> PlanningModel {
-    return PlanningModel(model=Model(model_name=name));
+    params: dict[str, object] = {};
+    if name.startswith("gemini/gemini-2.5-flash") {
+        params["reasoning_effort"] = "none";
+    }
+    return PlanningModel(model=Model(model_name=name, call_params=params));
 }
 
 def validation_feedback(slots: list[Slot], work: list[Work], busy: list[Busy],

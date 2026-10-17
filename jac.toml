@@ -45,6 +45,12 @@ watchdog = ">=3.0.0"
 
 [client]
 
+# Preserve API routes while matching OAuth callback query strings in dev previews.
+[client.vite.server.proxy.'"^/(api|walker|function|user|introspect|static|docs|openapi[.]json|healthz|admin|graph|redoc|assets|integrations/google-calendar/callback)(/|[?]|$)"']
+target = "http://localhost:8001"
+changeOrigin = true
+ws = true
+
 [dependencies.pypi]
 cryptography = ">=41.0.0"
 
