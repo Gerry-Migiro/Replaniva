@@ -124,6 +124,17 @@ def sync_planning_graph() -> list[str] {
     private_account();
     tasks = [node for node in list([root -->]) if isinstance(node, PlanningTask)];
     goals = [node for node in list([root -->]) if isinstance(node, PlanningGoal)];
+    goal_ids = {jid(goal) for goal in goals};
+    for task in tasks {
+        linked_goals = list([task ->:SupportsGoal:->]);
+        if task.relationships_migrated and len(linked_goals) > 1 and
+           task.goal_id in {jid(goal) for goal in linked_goals} and
+           all(jid(goal) in goal_ids for goal in linked_goals) {
+            for linked_goal in linked_goals {
+                if jid(linked_goal) != task.goal_id { task del --> linked_goal; }
+            }
+        }
+    }
     errors = graph_errors(tasks, goals);
     if errors { return errors; }
     for task in tasks {

@@ -42,6 +42,10 @@ test "secretary migrates relationships idempotently and traverses real graph cha
         assert sync_planning_graph() == [];
         assert len([second ->:DependsOn:->]) == 1;
         assert len([first ->:SupportsGoal:->]) == 1;
+        stale_goal = root ++> PlanningGoal(title="Earlier task goal");
+        first +>: SupportsGoal :+> stale_goal;
+        assert sync_planning_graph() == [];
+        assert [jid(item) for item in [first ->:SupportsGoal:->]] == [jid(goal)];
         replacement = root ++> PlanningGoal(title="Develop confidence");
         first.goal_id = jid(replacement);
         first.relationships_migrated = False;

@@ -184,7 +184,7 @@ Automated model and Calendar regressions use synthetic replies. Separate browser
 
 ## Hosting
 
-The current [Jac Hammer preview](https://preview-jac-sbx-f8b7149b41a44ce1b83812205a496474.jachammer.app/) is a temporary sandbox. Live signup, capture, planning questions, recovery approval and saved state after reload have been checked. Google Calendar authorization and synchronization still require configured deployment credentials and live verification. Configure production authentication and persistent storage before a production release. Keep secrets, runtime storage and caches out of Git. The bundled admin portal is disabled in `jac.toml`.
+The current [Jac Hammer preview](https://preview-jac-sbx-f8b7149b41a44ce1b83812205a496474.jachammer.app/) is a temporary sandbox. The narrated demo shows signup, capture, planning questions, recovery approval and saved state after reload. A new sandbox can start with empty account data. Google Calendar authorization and synchronization still require configured deployment credentials and live verification. Configure production authentication and persistent storage before a production release. Keep secrets, runtime storage and caches out of Git. The bundled admin portal is disabled in `jac.toml`.
 
 ## Dashboard appearance and visual assets
 
