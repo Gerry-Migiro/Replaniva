@@ -126,7 +126,7 @@ Browsing and selecting dates does not move tasks, approve proposals or contact G
 
 Replaniva Command keeps the conversation, suggested planning prompts, message field and microphone together. Suggested prompts fill the input for review before sending. Dictation uses the browser speech API: edit the transcript, then send it through the same proposal and validation flow. Browser and operating-system support determine voice availability.
 
-All four Web suggestions work without Gemini. Deterministic questions also cover next action, risks, capacity, plan explanation, dependencies, goal progress and recovery guidance, for example `Explain my plan`, `Show my dependencies` or `Show my goal progress`. **What works without Gemini?** lists examples in Command. Replies show their actual source. Other free-form questions may need a configured model; if interpretation is unavailable, use the listed questions or structured forms. Model availability does not make a preview an approved change.
+All four Web suggestions work without model assistance. Deterministic questions also cover next action, risks, capacity, plan explanation, dependencies, goal progress and recovery guidance, for example `Explain my plan`, `Show my dependencies` or `Show my goal progress`. **What works without model assistance?** lists examples in Command. Replies show their actual source. Other free-form questions may need a configured model; if interpretation is unavailable, use the listed questions or structured forms. Model availability does not make a preview an approved change.
 
 Task **Break down** opens a focused popup with editable steps and a duration total. Closing it does not apply a breakdown. Only **Apply breakdown** submits the reviewed steps for validation.
 

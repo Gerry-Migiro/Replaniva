@@ -71,7 +71,7 @@ def:pub CommandPanel(view_board: Board, questions: list[str], answers: list[Comm
                                     <button type="submit" disabled={busy or speech.listening or not command_query.strip()}><span className="sr-only">Send planning question</span><UiIcon name="arrow-up-right" /></button>
                                 </form>
                                 <VoicePanel listening={speech.listening} voice_supported={speech.supported} voice_error={speech.error} start_listening={speech.start} />
-                                <p id="command-input-help" className="command-input-help">Voice fills this message. Review it, then send when you are ready.</p>{onOfflineHelp and <button className="offline-help-button" type="button" onClick={onOfflineHelp}>What works without Gemini?</button>}
+                                <p id="command-input-help" className="command-input-help">Voice fills this message. Review it, then send when you are ready.</p>{onOfflineHelp and <button className="offline-help-button" type="button" onClick={onOfflineHelp}>What works without model assistance?</button>}
 
                             </div>
 
