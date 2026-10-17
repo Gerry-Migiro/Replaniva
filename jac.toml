@@ -67,7 +67,7 @@ enabled = true
 enabled = false
 
 [serve.websocket]
-allowed_origins = ["http://localhost:8100", "http://127.0.0.1:8100", "https://preview-jac-sbx-502b88fe495449528b3cd21fedf641ef.jachammer.app"]
+allowed_origins = ["http://localhost:8000", "http://127.0.0.1:8000", "https://preview-jac-sbx-502b88fe495449528b3cd21fedf641ef.jachammer.app"]
 
 [placement.pins]
 "endpoints" = "server"
@@ -77,6 +77,8 @@ allowed_origins = ["http://localhost:8100", "http://127.0.0.1:8100", "https://pr
 "secretary_runtime" = "server"
 "model_usage" = "server"
 "calendar_gateway" = "server"
+"console_api" = "server"
+"command_parser" = "server"
 
 [byllm.model]
 default_model = "gemini/gemini-2.5-flash"

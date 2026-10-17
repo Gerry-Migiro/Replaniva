@@ -273,7 +273,7 @@ def settings() -> Settings {
     legacy = [prefs for prefs in found if prefs.timezone];
     prefs = preferred[0] if preferred else legacy[0] if legacy else found[0] if found else root ++> Settings();
     if prefs.timezone { secretary_config().timezone = prefs.timezone; prefs.timezone = ""; }
-    prefs.migration_complete = True;
+    if not prefs.migration_complete { prefs.migration_complete = True; }
     return prefs;
 }
 

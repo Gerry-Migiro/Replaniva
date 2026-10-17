@@ -1,5 +1,6 @@
 """Shared client formatting and timeline projection."""
 
+import from .date_labels { day_label }
 import from endpoints { Board, TaskView }
 import from planning { Choice }
 
@@ -105,7 +106,7 @@ def:pub timeline_for(board: Board) -> list[TimelineItem] {
         events.append(TimelineItem(id=task.id, title=task.title, start=task.start,
                                    end=task.start + task.duration if task.start >= 0 else -1,
                                    kind="flexible", detail="DONE" if task.done else "FLEXIBLE · DUE " +
-                                       (task.due_day + " at " if task.due_day != board.day else "") +
+                                       (day_label(task.due_day) + " at " if task.due_day != board.day else "") +
                                        clock_time(task.deadline),
                                    done=task.done));
     }

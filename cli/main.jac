@@ -1,6 +1,8 @@
 """Replaniva terminal client for the same private plan used by web and mobile."""
 
 import argparse;
+import from date_labels { day_label }
+import from command_parser { make_parser }
 import from accounts { normalize_username }
 import re;
 import getpass;
@@ -24,7 +26,7 @@ def saved_token() -> str {
 }
 
 def endpoint(path: str, body: dict[str, any], token: str = "") -> dict[str, any] {
-    base = os.environ.get("REPLANIVA_URL", "http://127.0.0.1:8101").rstrip("/");
+    base = os.environ.get("REPLANIVA_URL", "http://127.0.0.1:8001").rstrip("/");
     headers = {"Content-Type": "application/json"};
     if token { headers["Authorization"] = "Bearer " + token; }
     request = urllib.request.Request(base + path, data=json.dumps(body).encode(), headers=headers);
@@ -110,19 +112,28 @@ def show_briefing(data: dict[str, any], section: str = "all") -> None {
 }
 
 def show_today(data: dict[str, any]) -> None {
-    print("Replaniva · " + data["day"]);
-    print("Flexible hours: " + time_label(data["day_start"]) + " to " + time_label(data["day_end"]));
-    print("Fixed commitments:");
+    print("PLAN  " + day_label(data["day"]));
+    print("─" * 48);
+    print("Planning hours  " + time_label(data["day_start"]) + "–" + time_label(data["day_end"]));
+    health = data["briefing"]["health"];
+    print("\nNEXT ACTION\n  " + data["briefing"]["next_action"]["title"]);
+    print("\nCAPACITY");
+    print("  Available  " + duration_label(health["available_minutes"]));
+    print("  Required   " + duration_label(health["required_minutes"]));
+    print("  Slack      " + duration_label(health["slack_minutes"]));
+    print("\nFIXED COMMITMENTS");
     for event in data["commitments"] {
         print(f"  {time_label(event['start'])}–{time_label(event['end'])}  {event['title']}");
     }
-    if not data["commitments"] { print("  None yet"); }
-    print("Tasks:");
+    if not data["commitments"] { print("  None on this day."); }
+    print("\nTASKS  (" + str(len(data["tasks"])) + ")");
     for (index, task) in enumerate(data["tasks"], 1) {
-        state = "done" if task["done"] else time_label(task["start"]);
-        print(f"  {index}. {task['title']} · {state} · due {task['due_day']} at {time_label(task['deadline'])}");
+        state = "Done" if task["done"] else "Unplaced" if task["start"] < 0 else time_label(task["start"]) + "–" + time_label(task["start"] + task["duration"]);
+        print(f"\n  {index}. {task['title']}");
+        print("     " + state + "  ·  " + str(task["duration"]) + " min");
+        print("     Due  " + day_label(task["due_day"] or data["day"]) + " at " + time_label(task["deadline"]));
     }
-    if not data["tasks"] { print("  None yet"); }
+    if not data["tasks"] { print("  No tasks on this day."); }
 }
 
 def show_week(data: dict[str, any]) -> None {
@@ -132,15 +143,15 @@ def show_week(data: dict[str, any]) -> None {
         if outlook["overloaded_minutes"] > 0 {
             pressure = "+" + duration_label(outlook["overloaded_minutes"]) + " over";
         }
-        print("  " + outlook["day"] + "  " + outlook["label"] + "  " + pressure);
+        print("  " + day_label(outlook["day"]) + "  " + outlook["label"] + "  " + pressure);
         print("    " + duration_label(outlook["required_minutes"]) + " work, " +
               duration_label(outlook["available_minutes"]) + " available");
     }
     suggestion = data["rebalance"];
     if suggestion["available"] {
         print("\nSuggested review:");
-        print("  Move " + suggestion["task_title"] + " from " + suggestion["from_day"] +
-              " to " + suggestion["to_day"] + " at " + time_label(suggestion["suggested_start"]));
+        print("  Move " + suggestion["task_title"] + " from " + day_label(suggestion["from_day"]) +
+              " to " + day_label(suggestion["to_day"]) + " at " + time_label(suggestion["suggested_start"]));
         print("  " + suggestion["reason"]);
     }
 }
@@ -179,7 +190,7 @@ def show_goals(data: dict[str, any]) -> None {
     print("Goals:");
     for (index, goal) in enumerate(goals, 1) {
         progress = f"{goal.get('completed_tasks', 0)}/{goal.get('total_tasks', 0)} tasks done";
-        target = f" · Target: {goal['target_date']}" if goal.get("target_date") else "";
+        target = f" · Target: {day_label(goal['target_date'])}" if goal.get("target_date") else "";
         status = " [completed]" if goal.get("completed", False) else "";
         print(f"  {index}. {goal['title']}{status} · {progress}{target}");
     }
@@ -193,7 +204,7 @@ def show_activity(data: dict[str, any]) -> None {
     }
     print("Planning activity:");
     for item in reversed(activities) {
-        print("  " + item["day"] + "  " + item["title"]);
+        print("  " + day_label(item["day"]) + "  " + item["title"]);
         print("    " + item["detail"]);
     }
 }
@@ -214,72 +225,6 @@ def show_proposals(data: dict[str, any], guided: bool = False) -> None {
     if not guided { print("\nAccept with `jac run cli -- proposal accept NUMBER` or dismiss with `... dismiss NUMBER`."); }
 }
 
-def make_parser() -> argparse.ArgumentParser {
-    parser = argparse.ArgumentParser(prog="replaniva", description="Your Replaniva plan from the terminal");
-    commands = parser.add_subparsers(dest="command", required=False);
-    login = commands.add_parser("login", help="sign in without displaying your password or token");
-    login.add_argument("username");
-    commands.add_parser("logout", help="remove the saved sign-in token");
-    commands.add_parser("today", help="show today's commitments and tasks");
-    commands.add_parser("week", help="show seven-day workload and a safe rebalance suggestion");
-    commands.add_parser("briefing", help="show plan health and the recommended next action");
-    commands.add_parser("health", help="show measured plan health and its reasons");
-    commands.add_parser("next", help="show the recommended next action");
-    commands.add_parser("activity", help="show recent plan changes and reasons");
-    commands.add_parser("notifications", help="read your private secretary inbox");
-    secretary = commands.add_parser("secretary", help="investigate a planning question with the shared secretary");
-    secretary.add_argument("question", nargs="?", `default="What should I do next?");
-    inbox_action = commands.add_parser("notification", help="read, dismiss or snooze a notification by its displayed number");
-    inbox_action.add_argument("number", `type=int);
-    inbox_action.add_argument("action", choices=["read", "dismiss", "snooze"]);
-    ask = commands.add_parser("ask", help="ask Replaniva a focused question about the current plan");
-    ask.add_argument("question");
-    add = commands.add_parser("add", help="add a task to today's plan");
-    add.add_argument("title");
-    add.add_argument("--minutes", `type=int, `default=60);
-    add.add_argument("--due", `default="20:00");
-    add.add_argument("--due-day", `default="", help="deadline date in YYYY-MM-DD (defaults to the planning day)");
-    add.add_argument("--at", `default="");
-    add.add_argument("--priority", `type=int, choices=[1, 2, 3], `default=2);
-    done = commands.add_parser("done", help="complete a task by its number from today");
-    done.add_argument("number", `type=int);
-    report_cmd = commands.add_parser("report", help="preview recovery for an unexpected commitment");
-    report_cmd.add_argument("title");
-    report_cmd.add_argument("--start", required=True);
-    report_cmd.add_argument("--end", required=True);
-    report_cmd.add_argument("--with-model", action="store_true", help="request a model-assisted alternative using the configured allowance");
-    plan = commands.add_parser("plan", help="view, accept, or restore a recovery");
-    plan.add_argument("action", nargs="?", choices=["view", "accept", "restore"], `default="view");
-    plan.add_argument("choice", nargs="?", choices=["minimal", "deadline"]);
-
-    commands.add_parser("goals", help="list goals with progress");
-    goal = commands.add_parser("goal", help="manage goals");
-    goal_sub = goal.add_subparsers(dest="goal_action", required=True);
-    goal_add = goal_sub.add_parser("add", help="add a goal");
-    goal_add.add_argument("title");
-    goal_add.add_argument("--target", `default="");
-    goal_add.add_argument("--importance", choices=["low", "medium", "high"], `default="medium");
-    goal_toggle = goal_sub.add_parser("toggle", help="toggle goal completion");
-    goal_toggle.add_argument("number", `type=int);
-    goal_delete = goal_sub.add_parser("delete", help="delete a goal");
-    goal_delete.add_argument("number", `type=int);
-
-    commands.add_parser("rebalance", help="apply active rebalance suggestion from seven-day outlook");
-
-    breakdown_cmd = commands.add_parser("breakdown", help="preview or apply task decomposition");
-    breakdown_cmd.add_argument("number", `type=int);
-    breakdown_cmd.add_argument("--apply", action="store_true", `default=False);
-
-    commands.add_parser("proposals", help="list pending Command proposals");
-    proposal = commands.add_parser("proposal", help="manage Command proposals");
-    proposal_sub = proposal.add_subparsers(dest="proposal_action", required=True);
-    prop_accept = proposal_sub.add_parser("accept", help="accept a Command proposal");
-    prop_accept.add_argument("number", `type=int);
-    prop_dismiss = proposal_sub.add_parser("dismiss", help="dismiss a Command proposal");
-    prop_dismiss.add_argument("number", `type=int);
-
-    return parser;
-}
 
 def run_login(args: argparse.Namespace) -> int {
     identity = normalize_username(args.username);
@@ -397,6 +342,11 @@ def run_report(args: argparse.Namespace) -> int {
 def run_plan(args: argparse.Namespace) -> int {
     data = board();
     if args.action == "view" { show_plan(data); return 0; }
+    if args.action == "dismiss" {
+        if data["proposal"] is None { raise ValueError("No recovery is awaiting approval."); }
+        result = call("dismiss_recovery", {"proposal_id": data["proposal"]["id"]});
+        print(result["message"]); return 0 if result["ok"] else 1;
+    }
     if args.action == "accept" {
         if not args.choice { raise ValueError("Choose `minimal` or `deadline`."); }
         if data["proposal"] is None { raise ValueError("No recovery is awaiting approval."); }
@@ -618,7 +568,7 @@ def interactive -> int {
             print("\nWhat would help right now?\n1 See today's plan\n2 Find my next step\n3 Add something to do\n4 Something changed\n5 Review suggested changes\n6 Mark a task done\n7 Ask about my plan\n8 See the week\n9 Account and help\n10 Secretary notifications\n0 Exit");
             choice = input("> ").strip();
             if choice in ["0", "exit", "quit"] { return 0; }
-            shortcuts = {"1": "today", "2": "next", "8": "week"};
+            shortcuts = {"1": "today", "2": "next", "8": "week", "10": "notifications"};
             if choice in shortcuts { run(parser.parse_args([shortcuts[choice]])); }
             elif choice in ["3", "4"] {
                 args = guided_fields("add" if choice == "3" else "report");

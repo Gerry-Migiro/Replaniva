@@ -2,6 +2,7 @@
 
 import from endpoints { TaskView, CommitmentView }
 import from planning { Choice }
+import from .frontend_panels { WorkspaceDialog }
 
 import from .frontend_format { clock_time, task_name, original_start, preview_style }
 
@@ -36,6 +37,7 @@ def:pub RecoveryMap(choice: Choice, tasks: list[TaskView], commitments: list[Com
 def:pub OptionCard(choice: Choice, tasks: list[TaskView], commitments: list[CommitmentView],
                    change_title: str, change_start: int, change_end: int,
                    day_start: int, day_end: int) -> JsxElement {
+    has inspect: bool = False;
     <div className="option-body">
         <div className="option-stat"><strong>{len(commitments) + 1}</strong><span>fixed protected</span></div>
         <div className="option-stat"><strong>{len(choice.slots)}</strong><span>placed</span></div>
@@ -43,9 +45,11 @@ def:pub OptionCard(choice: Choice, tasks: list[TaskView], commitments: list[Comm
         <div className="option-stat"><strong>{len(choice.unplaced)}</strong><span>deadline risks</span></div>
         <p className="option-source">{choice.source}</p>
         <p className="option-reason">{choice.reason}</p>
-        <RecoveryMap choice={choice} tasks={tasks} commitments={commitments}
+        <button type="button" className="button secondary comparison-launch" onClick={lambda -> None { inspect = True; }}>View schedule comparison</button>
+        {inspect and <WorkspaceDialog dialog_id={"compare-" + choice.key} title={choice.label + " · Schedule comparison"} onClose={lambda -> None { inspect = False; }}>        <RecoveryMap choice={choice} tasks={tasks} commitments={commitments}
             change_title={change_title} change_start={change_start} change_end={change_end}
             day_start={day_start} day_end={day_end}/>
+</WorkspaceDialog>}
         <div className="option-slots">
             {[<div className="slot-shift" key={slot.task_id}>
                 <span>{task_name(tasks, slot.task_id)}</span>

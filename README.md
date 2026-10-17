@@ -15,6 +15,7 @@ Replaniva is a private personal planner built around recovery. When a new commit
 - **Goals and task breakdown:** Track lightweight goals and preview editable, sequenced subtasks before applying them.
 - **Dependencies:** Keep prerequisite work in valid order and show blocked or unplaceable work instead of hiding it.
 - **Shared core:** Planning workspaces call the same authenticated planning service and deterministic scheduler.
+- **One Plan. Three Interfaces:** Use the Web dashboard, the actual mobile interface inside a phone frame, and an authenticated planning command console from the same website.
 
 The core rule is **AI proposes; deterministic Jac code validates.** Fixed commitments, overlaps, planning hours, durations, deadlines, dependencies, available capacity, proposal freshness, and placement feasibility are checked before a schedule change is accepted. The full structured recovery path works without an AI key.
 
@@ -31,16 +32,59 @@ From the project directory:
 ```bash
 jac install
 jac check
-jac run --dev --host 127.0.0.1 --port 8100 --api-port 8101
+jac run --dev --host 127.0.0.1 --port 8000 --api-port 8001
 ```
 
-Open **http://localhost:8100**. The API uses **8101**. Create an account or sign in with your username. Email-shaped usernames are also supported.
+Open **http://localhost:8000**. The API uses **8001**. Create an account or sign in with your username. Email-shaped usernames are also supported.
 
 The web app supports private accounts, dates, planning hours, tasks, fixed commitments, Daily Briefing, Plan Health, Next Action, Risk Radar, weekly outlook, goals, Command proposals, voice controls, task breakdown, Recovery Studio, approval, dismissal, and restore.
 
 A task is due on its planning date unless you choose a later due date in Capture. The later date lets Replaniva assess a requested move to another day without pretending that a deadline has changed.
 
 ## Terminal and mobile clients
+
+### One Plan. Three Interfaces.
+
+Open **Interfaces** after signing in and choose **Mobile app** or **CLI terminal**. The views are separate so each has usable space. **Fit screen** scales the entire 360 × 780 phone proportionally to your viewport; **Actual size** preserves its logical dimensions where space allows. The selected planning date and saved graph are shared with the Web dashboard. Interface state and console history remain available when navigating back to Today. **Refresh shared plan** reloads changes from another client.
+
+The phone frame renders the same `mobile/interface.jac` component as the standalone mobile app through React Native Web. Web and Mobile share the saved account data, planning operations, weekday/date formatter and appearance palette. Their screen components differ: Web uses HTML; Mobile uses native-compatible components with touch navigation. Mobile supports task capture and completion, fixed commitments, goals and dependencies, planning hours, secretary questions and notifications, and recovery approval and restore. It is an interactive browser app, not a native Android demonstration.
+
+The planning console uses the standalone CLI's command grammar and existing authenticated Jac operations. It opens in **Guided menu** mode: choose numbered actions, answer task/recovery questions one step at a time, and use `back` or `cancel` before submission. **Commands** switches to direct entry; `menu` returns to guided selection. Both modes use the same protected operations and explicit confirmation for saved changes. Type `help`, then try:
+
+```text
+today
+briefing
+next
+week
+health
+goals
+activity
+notifications
+ask "What should I do next?"
+add "Prepare the weekly plan" --minutes 30 --due 18:00
+```
+
+Task creation, completion, goal changes, recovery acceptance or restore, rebalance, proposal acceptance and applying breakdowns require a separate **Confirm change** action or `confirm REVIEW_ID`. The review is bound to your account and planning version and expires after five minutes. `cancel REVIEW_ID` discards it. Recovery previews and secretary questions do not apply their proposed schedule changes.
+
+Use `report "Unexpected meeting" --start 14:00 --end 15:00` to preview recovery, `plan` to inspect it, and `plan accept minimal` or `plan accept deadline` to request approval. `proposals`, `proposal accept NUMBER`, `proposal dismiss NUMBER`, `goal`, `rebalance`, `breakdown NUMBER`, and `notification NUMBER read|dismiss|snooze` are also supported. `help` gives the exact syntax. Output groups next action, capacity, fixed commitments and numbered tasks instead of showing raw internal IDs. Up and Down recall commands; Tab completes a unique command prefix; Ctrl+L, `clear` or **Clear output** clears the visible transcript. Ctrl+C cancels an unsent line.
+
+This console runs planning commands only. It does not expose a shell, filesystem, server environment or arbitrary code execution. Sign-out clears the embedded clients and their transcript. Pending console reviews are held in the serving process, so a restart or switching workers can require a fresh review; no saved change is repeated automatically after a connection failure.
+
+### Shared state and interface coverage
+
+All clients use the same account-owned graph. A supported change becomes visible in the other clients after their shared refresh or live update; a preview remains a preview everywhere.
+
+| Area | Web | Mobile | CLI |
+|---|---|---|---|
+| Plan, health, next action, outlook, questions | Available | Available | Available |
+| Tasks | Capture, complete/reopen, remove, breakdown | Capture, complete/reopen, remove, breakdown | Add, complete, breakdown |
+| Fixed commitments | Capture/remove | Capture/remove | Recovery capture |
+| Recovery and proposals | Preview, approve, dismiss, restore | Preview, approve, dismiss, restore | Preview, approve, dismiss, restore |
+| Goals | Manage and link tasks | Manage and link tasks | Manage goals |
+| Settings | Full settings | Planning hours and status | Plan/status queries |
+| Voice dictation and Google Calendar setup | Browser/owner setup required | Not provided | Not provided |
+
+### Standalone clients
 
 The terminal client shares the web account and planning API:
 
@@ -51,9 +95,9 @@ jac run cli -- ask "What is at risk?"
 jac run cli
 ```
 
-The local API defaults to `http://127.0.0.1:8101`. Set `REPLANIVA_URL` to use another deployment. The guided menu supports capture, recovery review and explicit approval. Sign-in stores a private token on the device; `jac run cli -- logout` removes it.
+The local API defaults to `http://127.0.0.1:8001`. Set `REPLANIVA_URL` to use another deployment. The guided menu supports capture, recovery review and explicit approval. Sign-in stores a private token on the device; `jac run cli -- logout` removes it.
 
-The mobile client uses the same protected planning operations and original mobile layouts:
+The mobile client uses the same protected planning operations and the same mobile component as the embedded phone:
 
 ```bash
 jac run --dev --platform web mobile
@@ -62,9 +106,11 @@ jac build mobile --platform web
 
 Native Android packaging requires the Android SDK and a device or emulator. A browser build does not establish native Android verification.
 
+Mobile is a frontend for the shared Jac service. For a separately hosted browser build, serve its generated files behind the same planning API or configure the Jac runtime API base to that service. A physical device needs a reachable HTTPS backend. Do not create a separate planning service or account for each interface.
+
 ## Recovery Studio
 
-Enter a disruption and its time, then choose **Explore recovery**. Previewing does not change saved tasks or add the commitment. Compare **Move as little as possible** and **Protect deadlines**, including work that cannot fit. Each option is checked against planning hours, fixed commitments, durations, deadlines and dependencies.
+Enter a disruption and its time, then choose **Explore recovery**. Previewing does not change saved tasks or add the commitment. The entry panel shows the weekday, date and planning hours; the review panel shows validated alternatives. Compare **Move as little as possible** and **Protect deadlines**, including work that cannot fit. **View schedule comparison** opens the detailed before/after schedule in a popup. Each option is checked against planning hours, fixed commitments, durations, deadlines and dependencies.
 
 Choose **Accept this plan** to apply an option, or dismiss the preview to keep the current plan. A change to the plan invalidates outstanding previews. **Restore previous plan** is available for the latest unchanged recovery and rechecks feasibility before restoring it.
 
@@ -80,11 +126,13 @@ Browsing and selecting dates does not move tasks, approve proposals or contact G
 
 Replaniva Command keeps the conversation, suggested planning prompts, message field and microphone together. Suggested prompts fill the input for review before sending. Dictation uses the browser speech API: edit the transcript, then send it through the same proposal and validation flow. Browser and operating-system support determine voice availability.
 
+All four Web suggestions work without Gemini. Deterministic questions also cover next action, risks, capacity, plan explanation, dependencies, goal progress and recovery guidance, for example `Explain my plan`, `Show my dependencies` or `Show my goal progress`. **What works without Gemini?** lists examples in Command. Replies show their actual source. Other free-form questions may need a configured model; if interpretation is unavailable, use the listed questions or structured forms. Model availability does not make a preview an approved change.
+
 Task **Break down** opens a focused popup with editable steps and a duration total. Closing it does not apply a breakdown. Only **Apply breakdown** submits the reviewed steps for validation.
 
 ## Settings and guided tour
 
-Open **Settings** to manage appearance, planning hours, assistant preferences and integration readiness. The **Quick Guide** at the top of Today starts the written tour or browser narration. Browser narration does not use the model allowance.
+Open **Settings** to manage appearance, planning hours, assistant preferences and integration readiness. Its navigation stays beside an independently scrolling content panel on larger screens and becomes a section picker on phones. **Check my plan now** displays its result beside the controls; action feedback also stays visible in a viewport notification. The **Quick Guide** at the top of Today starts a 14-stop tour that highlights specific cards across Today, Command, Capture, Recovery, Settings and Interfaces, with optional browser narration. Browser narration does not use the model allowance.
 
 No model key is required for deterministic planning or structured recovery. Optional model assistance uses bounded provider calls and application allowances. If interpretation is unavailable, use the structured time fields. Configure provider credentials through deployment secrets or an excluded local environment file. Raw provider credentials are not accepted through browser forms.
 
@@ -105,6 +153,7 @@ Google Calendar requires separate owner setup and consent. Live synchronization 
 - `model_usage.jac` enforces model allowances, private caching and provider cooldowns.
 - `calendar_gateway.jac` handles Calendar requests and encrypted OAuth storage.
 - `cli/main.jac` and `mobile/main.jac` provide terminal and mobile interfaces to the shared planning service.
+- `command_parser.jac` supplies the shared terminal grammar; `console_api.jac` exposes the protected command allowlist and account-bound approval reviews. `frontend_interfaces.jac` hosts the mobile component and browser console.
 - `frontend.jac` coordinates web navigation and shared state. The `frontend_*` modules separate Settings, conversation, dialogs, recovery views, speech, live connection, tour and formatting.
 
 ## Verification
@@ -114,6 +163,9 @@ jac check
 jac test planning.jac intelligence.jac assistant.jac accounts.jac account_clock.jac secretary_tests.jac model_provider_tests.jac
 jac test endpoints.jac
 jac test test_model_usage.jac test_calendar_gateway.jac cli_tests.jac
+jac test console_tests.jac
+jac build --as client Replaniva
+jac build mobile --platform web
 ```
 
 Model and Calendar tests use synthetic replies rather than live external calls. Compiler warnings remain visible.

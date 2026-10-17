@@ -1,5 +1,6 @@
 """Focused planner panels with explicit data and action callbacks."""
 
+import from .date_labels { day_label }
 import from react { useEffect }
 import from endpoints { PlannerMonth, NotificationView, BreakdownProposal }
 import from studio { UiIcon }
@@ -40,8 +41,8 @@ def:pub PlanningCalendar(planner_month: PlannerMonth | None, selected_day: str, 
                         <div className="month-status" role="status">{"Loading calendar…" if month_busy else "Select a date to open its plan."}</div>
                         {planner_month and <div className="month-calendar" aria-label={planner_month.label}>
                             <div className="month-weekdays" aria-hidden="true">{[<span key={str(index)}>{["M", "T", "W", "T", "F", "S", "S"][index]}</span> for index in range(7)]}</div>
-                            <div className="month-dates">{[<button type="button" key={day.day} className={"month-date " + ("other-month " if not day.in_month else "") + ("has-work " if day.tasks + day.commitments > 0 else "") + ("has-deadline " if day.deadlines > 0 else "")} aria-pressed={day.day == selected_day} aria-current={"date" if day.day == planner_month.today else None} aria-label={day.day + ": " + str(day.tasks) + " tasks, " + str(day.commitments) + " commitments, " + str(day.deadlines) + " outstanding deadlines"} disabled={busy or month_busy} onClick={lambda -> None { switch_day(day.day); return; }}><span>{str(day.number)}</span><span className="month-markers" aria-hidden="true">{day.tasks > 0 and <i className="task-marker"></i>}{day.commitments > 0 and <i className="commitment-marker"></i>}{day.deadlines > 0 and <i className="deadline-marker"></i>}</span></button> for day in days]}</div>
-                            <div className="month-footer"><button type="button" disabled={busy or month_busy} onClick={lambda -> None { if planner_month { switch_day(planner_month.today); } return; }}>Back to today</button><span>{selected_day}</span></div>
+                            <div className="month-dates">{[<button type="button" key={day.day} className={"month-date " + ("other-month " if not day.in_month else "") + ("has-work " if day.tasks + day.commitments > 0 else "") + ("has-deadline " if day.deadlines > 0 else "")} aria-pressed={day.day == selected_day} aria-current={"date" if day.day == planner_month.today else None} aria-label={day_label(day.day) + ": " + str(day.tasks) + " tasks, " + str(day.commitments) + " commitments, " + str(day.deadlines) + " outstanding deadlines"} disabled={busy or month_busy} onClick={lambda -> None { switch_day(day.day); return; }}><span>{str(day.number)}</span><span className="month-markers" aria-hidden="true">{day.tasks > 0 and <i className="task-marker"></i>}{day.commitments > 0 and <i className="commitment-marker"></i>}{day.deadlines > 0 and <i className="deadline-marker"></i>}</span></button> for day in days]}</div>
+                            <div className="month-footer"><button type="button" disabled={busy or month_busy} onClick={lambda -> None { if planner_month { switch_day(planner_month.today); } return; }}>Back to today</button><span>{day_label(selected_day)}</span></div>
                             <p className="month-legend"><span><i className="task-marker"></i>Tasks</span><span><i className="commitment-marker"></i>Fixed</span><span><i className="deadline-marker"></i>Due</span></p>
                         </div>}
                         <div className="planning-toolbox"><h3>Planning tools</h3><div className="tool-grid">
@@ -61,7 +62,7 @@ def:pub NotificationInbox(inbox: list[NotificationView], busy: bool, secretary_e
                 {secretary_error and <p role="status">{secretary_error}</p>}
                 <button className="button secondary" type="button" onClick={lambda -> None { load_inbox(); return; }}>Refresh notifications</button>
                 {len(inbox) == 0 and <p className="empty-state">You are all caught up. Enable your secretary in Settings → Assistant for proactive checks.</p>}
-                {[<article className="notification-item" key={item.id}><span className="eyebrow">{item.kind}</span><h3>{item.title}</h3><p>{item.message}</p><time>{item.day}</time><div className="notification-actions">
+                {[<article className="notification-item" key={item.id}><span className="eyebrow">{item.kind}</span><h3>{item.title}</h3><p>{item.message}</p><time dateTime={item.day}>{day_label(item.day)}</time><div className="notification-actions">
                     {not item.read and <button className="button secondary" type="button" onClick={lambda -> None { notification_action(item.id, "read"); return; }}>Mark read</button>}
                     <button className="button secondary" type="button" onClick={lambda -> None { notification_action(item.id, "snooze"); return; }}>Snooze 15 min</button><button className="button secondary" type="button" onClick={lambda -> None { notification_action(item.id, "dismiss"); return; }}>Dismiss</button>
                     {item.task_id and <button className="button secondary" type="button" onClick={lambda -> None { onViewDay(item.day); return; }}>View task day</button>}

@@ -15,7 +15,7 @@ def:pub AssistantSettings(connections: ServerConnectionView, alerts_active: bool
         focus_suggestions: list[PreferenceView] = [], focus_choice: str = "morning", preference_busy: bool = False,
         secretary_enabled: bool = False, secretary_zone: str = "Africa/Nairobi", secretary_morning: str = "08:00",
         secretary_quiet_start: str = "22:00", secretary_quiet_end: str = "08:00", secretary_lead: int = 15,
-        secretary_busy: bool = False, browser_alerts: bool = alerts_active;
+        action_feedback: str = "", check_busy: bool = False, secretary_busy: bool = False, browser_alerts: bool = alerts_active;
     async def load_secretary() -> None {
         try {
             prefs = await secretary_settings();
@@ -43,6 +43,7 @@ def:pub AssistantSettings(connections: ServerConnectionView, alerts_active: bool
             result = await secretary_update_settings(enabled=secretary_enabled, timezone_name=secretary_zone,
                 morning=time_minutes(secretary_morning), quiet_start=time_minutes(secretary_quiet_start),
                 quiet_end=time_minutes(secretary_quiet_end), lead=secretary_lead);
+            action_feedback = result.message;
             onNotice(result.message);
             if not result.ok { secretary_error = result.message; }
             await load_secretary();
@@ -63,6 +64,7 @@ def:pub AssistantSettings(connections: ServerConnectionView, alerts_active: bool
     async def preference_action(id: str, accept: bool) -> None {
         try {
             result = await secretary_decide_preference(suggestion_id=id, accept=accept);
+            action_feedback = result.message;
             onNotice(result.message);
             await load_secretary();
         } except Exception { secretary_error = "The update could not be confirmed. Reload the status before retrying."; }
@@ -73,6 +75,7 @@ def:pub AssistantSettings(connections: ServerConnectionView, alerts_active: bool
         secretary_error = "";
         try {
             result = await secretary_propose_focus(period=focus_choice);
+            action_feedback = result.message;
             onNotice(result.message);
             if not result.ok { secretary_error = result.message; }
             focus_suggestions = await secretary_preferences();
@@ -81,23 +84,27 @@ def:pub AssistantSettings(connections: ServerConnectionView, alerts_active: bool
     }
 
     async def check_secretary() -> None {
+        if check_busy { return; }
+        check_busy = True; action_feedback = "Checking your saved plan…";
         try {
             result = await secretary_check_now();
+            action_feedback = result.message;
             onNotice(result.message);
             await onInboxChanged();
-        } except Exception { secretary_error = "The update could not be confirmed. Reload the status before retrying."; }
+        } except Exception { action_feedback = "The check could not be confirmed. Refresh your inbox before retrying."; }
+        finally { check_busy = False; }
     }
-
     async def forget_focus() -> None {
         try {
             result = await secretary_forget_focus();
+            action_feedback = result.message;
             onNotice(result.message);
             await load_secretary();
         } except Exception { secretary_error = "The update could not be confirmed. Reload the status before retrying."; }
     }
     useEffect(lambda { load_secretary(); return; }, []);
     return <div className="settings-stack">
-                            <article className="settings-card"><div className="settings-card-head"><div><UiIcon name="bell" /><h2>Your planning secretary</h2></div></div>
+                            <article className="settings-card secretary-settings-card"><div className="settings-card-head"><div><UiIcon name="bell" /><h2>Your planning secretary</h2></div></div>
                                 <p>Briefings, reminders and follow-ups use your saved plan. Keep this service running. No model is called by scheduled checks.</p>
                                 {secretary_error and <p className="calendar-feedback" role="status">{secretary_error}</p>}
                                 <form className="secretary-settings-form" onSubmit={save_secretary}>
@@ -108,7 +115,8 @@ def:pub AssistantSettings(connections: ServerConnectionView, alerts_active: bool
                                     <button className="button primary" type="submit" disabled={secretary_busy}>Save secretary settings</button>
                                 </form>
                                 <p className="connection-help">{"Background job registered" if secretary_prefs and secretary_prefs.job_id else "No background job enabled"}. Browser alerts need an open supported browser; the inbox remains available without them.</p>
-                                <div className="calendar-actions"><button className="button secondary" type="button" onClick={enable_browser_alerts}>{"Browser alerts enabled for this session" if browser_alerts else "Enable browser alerts"}</button><button className="button secondary" type="button" onClick={check_secretary}>Check my plan now</button></div>
+                                <div className="calendar-actions"><button className="button secondary" type="button" onClick={enable_browser_alerts}>{"Browser alerts enabled for this session" if browser_alerts else "Enable browser alerts"}</button><button className="button secondary" type="button" disabled={check_busy} onClick={check_secretary}>{"Checking…" if check_busy else "Check my plan now"}</button></div>
+                                {action_feedback and <p className="inline-feedback" role="status" aria-live="polite">{action_feedback}</p>}
                                 <div className="setting-group"><h3>Approved focus preference</h3><p>{secretary_prefs.focus_period if secretary_prefs and secretary_prefs.focus_period else "Nothing remembered yet."}</p>
                                     <label htmlFor="focus-period">Preferred focus period</label><select id="focus-period" value={focus_choice} disabled={preference_busy} onChange={lambda (e: ChangeEvent) { focus_choice = e.target.value; }}><option value="morning">Morning</option><option value="afternoon">Afternoon</option><option value="evening">Evening</option></select>
                                     <p className="connection-help">Choose a period, then review and confirm the change. Remembering a preference does not move saved work.</p><div className="calendar-actions"><button className="button secondary" type="button" disabled={preference_busy} onClick={review_focus_change}>Review preference change</button>{secretary_prefs and secretary_prefs.focus_period and <button className="button secondary" type="button" onClick={forget_focus}>Forget focus preference</button>}</div></div>

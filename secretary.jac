@@ -137,9 +137,11 @@ def sync_planning_graph() -> list[str] {
             }
             task.relationships_migrated = True;
         }
-        task.depends_on = [jid(node) for node in [node for node in list([task ->:DependsOn:->]) if isinstance(node, PlanningTask)]];
+        dependency_ids = [jid(node) for node in [node for node in list([task ->:DependsOn:->]) if isinstance(node, PlanningTask)]];
+        if task.depends_on != dependency_ids { task.depends_on = dependency_ids; }
         linked = [node for node in list([task ->:SupportsGoal:->]) if isinstance(node, PlanningGoal)];
-        task.goal_id = jid(linked[0]) if linked else "";
+        goal_id = jid(linked[0]) if linked else "";
+        if task.goal_id != goal_id { task.goal_id = goal_id; }
     }
     return [];
 }

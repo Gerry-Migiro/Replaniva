@@ -5,16 +5,19 @@ import from react { useEffect, useRef }
 import from accounts { normalize_username }
 import from endpoints { Board, Action, CommandReply, BreakdownProposal, preview_task_breakdown, apply_task_breakdown, get_board, get_planner_month, PlannerMonth, create_task, set_task_done, delete_task, create_commitment, delete_commitment, preview_recovery, dismiss_recovery, accept_recovery, restore_revision, interpret_disruption, update_planning_hours, update_tour_state, update_appearance, create_goal, toggle_goal, delete_goal, apply_command_proposal, dismiss_command_proposal, apply_rebalance_candidate, CalendarPreview, calendar_status, calendar_connect, calendar_finish, calendar_select, calendar_disconnect, calendar_create_export_calendar, calendar_preview_import, calendar_preview_export, calendar_approve, calendar_dismiss, SecretaryRunView, NotificationView, secretary_notifications, secretary_notification, secretary_run }
 
+import from .date_labels { day_label }
+import from .ui_theme { appearance_vars }
 import from studio { UiIcon, CompanionVisual, CapacityOrbit }
 import from .assistant { SubtaskDraft }
 
 import from .frontend_speech { useSpeech }
 import from .frontend_live { useSecretaryLive }
 import from .frontend_command { CommandPanel }
+import from .frontend_interfaces { InterfacesWorkspace }
 import from .frontend_settings { AssistantSettings }
 import from .frontend_format { clock_time, duration_label, pressure_style, workload_style, short_day, outlook_date_label, time_minutes, same_plan, timeline_for }
 import from .frontend_recovery { OptionCard }
-import from .frontend_tour { tour_title, tour_copy, tour_page, GuidedTour }
+import from .frontend_tour { tour_title, tour_copy, tour_page, tour_count, tour_target, tour_settings, GuidedTour }
 import from .frontend_panels { PlanningCalendar, NotificationInbox, BreakdownDialog, WorkspaceDialog }
 
 def login_name(value: str) -> str {
@@ -131,8 +134,8 @@ def:pub Planner(onSignOut: any) -> JsxElement {
         goal_title: str = "", goal_target_date: str = "", goal_importance: str = "medium",
         breakdown_proposal: BreakdownProposal | None = None,
         breakdown_error: str = "",
-        active_page: str = "today",
-        tour_step: int = -1, tour_checked: bool = False,
+        active_page: str = "today", interface_refresh: int = 0, interfaces_opened: bool = False,
+        tour_step: int = -1, tour_checked: bool = False, tour_placement: any = {}, tour_highlight: any = {},
         appearance_checked: bool = False, command_focus: bool = False, jump_target: str = "",
         settings_section: str = "workspace", settings_focus: bool = False,
         calendar_state: any = None, calendar_busy: bool = False, calendar_feedback: str = "",
@@ -141,7 +144,7 @@ def:pub Planner(onSignOut: any) -> JsxElement {
         secretary_last_run: SecretaryRunView | None = None,
         inbox: list[NotificationView] = [], inbox_open: bool = False, secretary_error: str = "",
         live_connected: bool = False, goal_dialog_open: bool = False, explanation_dialog: str = "",
-        calendar_review_open: bool = False;
+        calendar_review_open: bool = False, planning_date_open: bool = False, planning_day_input: str = "", command_sources: list[str] = [];
     speech = useSpeech(lambda (text: str) -> None { command_query = text[:300]; });
     useEffect(lambda -> None {
         if active_page != "command" { speech.cancel(); }
@@ -223,6 +226,7 @@ def:pub Planner(onSignOut: any) -> JsxElement {
             if request_id != board_request.current { return; }
             board = result;
             selected_day = result.day;
+            planning_day_input = result.day;
             selected_day_ref.current = result.day;
             planning_start = clock_time(result.day_start);
             planning_end = clock_time(result.day_end);
@@ -326,19 +330,49 @@ def:pub Planner(onSignOut: any) -> JsxElement {
     }
 
     useEffect(lambda {
-        if tour_step >= 0 {
-            close_button: any = document.querySelector(".tour-close");
-            if close_button { close_button.focus(); }
+        if tour_step < 0 { return; }
+        win: any = window;
+        def position_guide() -> None {
+            target: any = document.querySelector(tour_target(tour_step));
+            coach: any = document.querySelector(".tour-coach");
+            if not target or not coach { return; }
+            rect: any = target.getBoundingClientRect();
+            width = min(390, win.innerWidth - 24);
+            height = min(coach.offsetHeight, win.innerHeight - 24);
+            top = max(100, min(rect.top, win.innerHeight - 100));
+            tour_highlight = {"left": str(max(8, rect.left - 4)) + "px", "top": str(top - 4) + "px",
+                "width": str(min(rect.width + 8, win.innerWidth - 16)) + "px",
+                "height": str(min(rect.height + 8, 220, win.innerHeight - top - 12)) + "px"};
+            left = rect.right + 18 if rect.right + width + 30 < win.innerWidth else 12 if rect.left > width + 30 else win.innerWidth - width - 12;
+            coach_top = min(104 if top > win.innerHeight / 2 else max(12, win.innerHeight - height - 12), max(12, win.innerHeight - height - 12));
+            tour_placement = {"left": str(left) + "px", "top": str(coach_top) + "px", "right": "auto", "bottom": "auto", "width": str(width) + "px"};
         }
-    }, [tour_step]);
+        def reveal() -> None {
+            target: any = document.querySelector(tour_target(tour_step));
+            if target { target.scrollIntoView({"block": "start", "behavior": "instant"}); }
+            position_guide();
+            close_button: any = document.querySelector(".tour-close");
+            if close_button { close_button.focus({"preventScroll": True}); }
+        }
+        timer = win.setTimeout(reveal, 120);
+        win.addEventListener("resize", position_guide);
+        win.addEventListener("scroll", position_guide, True);
+        return lambda { win.clearTimeout(timer); win.removeEventListener("resize", position_guide); win.removeEventListener("scroll", position_guide, True); };
+    }, [tour_step, active_page, settings_section]);
 
     def open_page(page: str) -> None {
+        if page != active_page { notice = ""; }
         active_page = page;
+        if page == "interfaces" { interfaces_opened = True; }
         goal_dialog_open = False;
         explanation_dialog = "";
         calendar_review_open = False;
-        try { window.scrollTo({"top": 0, "behavior": "smooth"}); } except Exception {}
+        try { window.scrollTo({"top": 0, "behavior": "instant"}); } except Exception {}
     }
+
+    useEffect(lambda -> None {
+        try { window.scrollTo({"top": 0, "behavior": "instant"}); } except Exception {}
+    }, [active_page]);
 
     def choose_settings(section: str) -> None {
         settings_section = section;
@@ -347,12 +381,13 @@ def:pub Planner(onSignOut: any) -> JsxElement {
     useEffect(lambda -> None {
         if active_page == "settings" and settings_focus {
             heading: any = document.getElementById("settings-view-title");
-            if heading { heading.focus(); }
+            if heading { heading.focus({"preventScroll": True}); panel: any = document.querySelector(".settings-main"); if panel { panel.scrollTop = 0; } }
             settings_focus = False;
         }
     }, [active_page, settings_section, settings_focus]);
 
     def ask_shortcut(query: str = "") -> None {
+        if active_page != "command" { notice = ""; }
         active_page = "command";
         try { window.scrollTo({"top": 0, "behavior": "instant"}); } except Exception {}
         if query { command_query = query; }
@@ -360,8 +395,9 @@ def:pub Planner(onSignOut: any) -> JsxElement {
     }
     def open_workspace(target: str) -> None {
         if target == "command" { ask_shortcut(); return; }
-        if target in ["capture", "recovery", "settings", "today"] { open_page(target); }
-        else { active_page = "today"; jump_target = target; }
+        if target == "settings" { choose_settings("assistant"); open_page("settings"); return; }
+        if target in ["capture", "recovery", "settings", "today", "interfaces"] { open_page(target); }
+        else { open_page("today"); jump_target = "timeline" if target in ["plan", "schedule", "timeline"] else "outlook" if target in ["week", "outlook"] else "goals" if target in ["goal", "goals"] else "activity" if target == "activity" else "timeline"; }
     }
     useEffect(lambda -> None {
         if active_page == "command" and command_focus {
@@ -382,7 +418,7 @@ def:pub Planner(onSignOut: any) -> JsxElement {
             if not result.ok {
                 light = previous;
                 notice = result.message;
-            }
+            } else { interface_refresh += 1; await refresh(); }
         } except Exception {
             light = previous;
             notice = "Appearance could not be saved.";
@@ -392,7 +428,7 @@ def:pub Planner(onSignOut: any) -> JsxElement {
     def speak_tour() -> None {
         if tour_audio and speech.speaking { speech.stop(); tour_audio = False; return; }
         tour_audio = True;
-        speech.speak("Step " + str(tour_step + 1) + " of four. " + tour_title(tour_step) + ". " + tour_copy(tour_step));
+        speech.speak("Step " + str(tour_step + 1) + " of " + str(tour_count()) + ". " + tour_title(tour_step) + ". " + tour_copy(tour_step));
     }
     def start_tour() -> None {
         tour_step = 0;
@@ -423,7 +459,7 @@ def:pub Planner(onSignOut: any) -> JsxElement {
     }
 
     async def next_tour_step() -> None {
-        if tour_step >= 3 {
+        if tour_step >= tour_count() - 1 {
             await close_tour();
             return;
         }
@@ -431,6 +467,7 @@ def:pub Planner(onSignOut: any) -> JsxElement {
         tour_audio = False;
         tour_step += 1;
         open_page(tour_page(tour_step));
+        if tour_settings(tour_step) { settings_section = tour_settings(tour_step); }
     }
 
     def previous_tour_step() -> None {
@@ -439,6 +476,7 @@ def:pub Planner(onSignOut: any) -> JsxElement {
         tour_audio = False;
         tour_step -= 1;
         open_page(tour_page(tour_step));
+        if tour_settings(tour_step) { settings_section = tour_settings(tour_step); }
     }
 
     async def perform_action(operation: any, on_success: any = None) -> None {
@@ -550,8 +588,8 @@ def:pub Planner(onSignOut: any) -> JsxElement {
     async def open_day(e: FormEvent) -> None {
         e.preventDefault();
         busy = True;
-        await refresh(selected_day);
-        if not session_error { notice = "Opened your plan for " + selected_day + "."; }
+        await refresh(planning_day_input);
+        if not session_error and not load_error { notice = "Opened your plan for " + day_label(selected_day) + "."; planning_date_open = False; }
         busy = False;
     }
 
@@ -574,6 +612,7 @@ def:pub Planner(onSignOut: any) -> JsxElement {
             reply = secretary_last_run.reply;
             command_questions = (command_questions + [submitted_query])[-20:];
             command_answers = (command_answers + [reply])[-20:];
+            command_sources = (command_sources + [secretary_last_run.source])[-20:];
         } except Exception { notice = "The secretary could not finish. Your saved plan was not changed."; busy = False; return; }
         if reply is not None and reply.proposal is not None {
             selected_day = reply.proposal.day;
@@ -654,7 +693,7 @@ def:pub Planner(onSignOut: any) -> JsxElement {
     placed = len([t for t in view_board.tasks if not t.done and t.start >= 0]);
     proposal = view_board.proposal;
     proposal_id = proposal.id if proposal is not None else "";
-    return <div className={"app-shell studio-shell light" if light else "app-shell studio-shell dark"}>
+    return <div className={"app-shell studio-shell light" if light else "app-shell studio-shell dark"} style={appearance_vars(light)}>
         <a className="skip-link" href="#main">Skip to plan</a>
         <main id="main" className="main-content" tabIndex={-1}>
             <div className="workspace-masthead">
@@ -665,36 +704,35 @@ def:pub Planner(onSignOut: any) -> JsxElement {
                     <button type="button" title="Recovery Studio" aria-current={"page" if active_page == "recovery" else None} onClick={lambda -> None { open_page("recovery"); }}><span className="navigation-core"><span className="recovery-glyph" aria-hidden="true">↝</span></span><span>Recover</span></button>
                     <button type="button" title="Capture" aria-current={"page" if active_page == "capture" else None} onClick={lambda -> None { open_page("capture"); }}><UiIcon name="plus" /><span>Capture</span></button>
                     <button type="button" title="Settings" aria-current={"page" if active_page == "settings" else None} onClick={lambda -> None { open_page("settings"); }}><UiIcon name="settings-2" /><span>Settings</span></button>
+                    <button type="button" title="One Plan. Three Interfaces." aria-current={"page" if active_page == "interfaces" else None} onClick={lambda -> None { open_page("interfaces"); }}><UiIcon name="terminal" /><span>Interfaces</span></button>
                 </nav>
                 <div className="workspace-actions"><button type="button" className="icon-button notification-bell" aria-label={"Notifications, " + str(len([item for item in inbox if not item.read])) + " unread"} onClick={lambda -> None { inbox_open = True; load_inbox(); return; }}><UiIcon name="bell" />{len([item for item in inbox if not item.read]) > 0 and <span className="notification-count">{str(len([item for item in inbox if not item.read]))}</span>}</button><button type="button" className="icon-button" aria-label={"Use dark appearance" if light else "Use light appearance"} title={"Use dark appearance" if light else "Use light appearance"} onClick={lambda -> None { save_appearance(not light); return; }}><UiIcon name={"moon" if light else "sun"} /></button><button type="button" className="icon-button" aria-label="Open account settings" title="Account settings" onClick={lambda -> None { open_page("settings"); }}><UiIcon name="settings-2" /></button><button type="button" className="icon-button" aria-label="Sign out" title="Sign out" onClick={lambda -> None { onSignOut(); }}><UiIcon name="log-out" /></button></div>
             </div>
-            {active_page not in ["settings", "command"] and <header className={"topbar topbar-today" if active_page == "today" else "topbar"}>
-                {active_page == "today" and <div className="tour-launcher" role="group" aria-label="Guided tour"><UiIcon name="book-open" /><button className="tour-start" type="button" onClick={start_tour}><span>QUICK GUIDE</span>Start tour</button><button className="icon-button" type="button" aria-label="Speak guided tour" title={"Speak guided tour" if speech.narration_supported else "Read-aloud is unavailable in this browser"} disabled={not speech.narration_supported} onClick={lambda -> None { start_tour(); tour_audio = True; speech.speak("Step one of four. " + tour_title(0) + ". " + tour_copy(0)); }}><UiIcon name="volume-2" /></button></div>}
+            {active_page not in ["settings", "command", "interfaces"] and <header className={"topbar topbar-today" if active_page == "today" else "topbar"}>
+                {active_page == "today" and <div className="tour-launcher" role="group" aria-label="Guided tour"><UiIcon name="book-open" /><button className="tour-start" type="button" onClick={start_tour}><span>QUICK GUIDE</span>Start tour</button><button className="icon-button" type="button" aria-label="Speak guided tour" title={"Speak guided tour" if speech.narration_supported else "Read-aloud is unavailable in this browser"} disabled={not speech.narration_supported} onClick={lambda -> None { start_tour(); tour_audio = True; speech.speak("Step one of " + str(tour_count()) + ". " + tour_title(0) + ". " + tour_copy(0)); }}><UiIcon name="volume-2" /></button></div>}
                 {active_page != "today" and <div>
                     <span className="eyebrow">{"RECOVERY STUDIO" if active_page == "recovery" else "CAPTURE THE PLAN" if active_page == "capture" else "COMMAND WORKSPACE"}</span>
                     <h1>{"Find the best way forward." if active_page == "recovery" else "Give every commitment a place." if active_page == "capture" else "Your planning secretary."}</h1>
                 </div>}
                 {active_page == "today" and <div className="selected-plan-date"><UiIcon name="calendar-days" /><div><span>VIEWING YOUR PLAN</span><time dateTime={selected_day}>{outlook_date_label(selected_day, True) + ", " + outlook_date_label(selected_day)}</time></div></div>}
-                {active_page != "today" and <form className="day-switcher" onSubmit={open_day}>
-                    <label htmlFor="planning-day">Planning date</label>
-                    <div><input id="planning-day" type="date" required={True} value={selected_day} onChange={lambda (e: ChangeEvent) { selected_day = e.target.value; }}/><button type="submit" disabled={busy}>Open day</button></div>
-                </form>}
+                {active_page != "today" and <button type="button" className="selected-plan-date compact-plan-date" aria-label={"Change planning date, " + day_label(selected_day)} aria-haspopup="dialog" onClick={lambda -> None { planning_day_input = selected_day; planning_date_open = True; }}><UiIcon name="calendar-days" /><div><span>VIEWING YOUR PLAN</span><time dateTime={selected_day}>{day_label(selected_day)}</time></div><UiIcon name="chevron-down" /></button>}
             </header>}
+            {interfaces_opened and <div hidden={active_page != "interfaces"}><InterfacesWorkspace day={selected_day} version={view_board.version} refresh_token={interface_refresh} onChanged={lambda -> None { interface_refresh += 1; refresh(); load_inbox(); }} onDayChanged={lambda (day: str) -> None { selected_day = day; refresh(day); return; }} onSignOut={onSignOut} /></div>}
             {load_error and <div className="notice" role="alert"><span>{load_error}</span><button className="button secondary" type="button" onClick={lambda -> None { refresh(); return; }}>Retry loading plan</button></div>}
-            {notice and <div className="notice"><span role="status" aria-live="polite">{notice}</span><button className="notice-close" type="button" aria-label="Dismiss notification" onClick={lambda -> None { notice = ""; }}>×</button></div>}
+            {notice and <div className="notice feedback-toast" role="region" aria-label="Action result"><span role="status" aria-live="polite">{notice}</span><button className="notice-close" type="button" aria-label="Dismiss notification" onClick={lambda -> None { notice = ""; }}>×</button></div>}
             {active_page == "command" and <div className="page-view command-workspace">
                 <aside className="command-suggestions" aria-label="Planning suggestions"><div className="command-intro"><span className="eyebrow">COMMAND</span><h1>Your planning secretary.</h1><p>Choose a starting point, then make it your own.</p></div><div className="command-suggestion-list">
                     <button className="command-suggestion" type="button" onClick={lambda -> None { ask_shortcut("What should I do next?"); }}><UiIcon name="layers" /><span><strong>Find my next step</strong><small>Start with what matters now</small></span><UiIcon name="arrow-up-right" /></button>
                     <button className="command-suggestion" type="button" onClick={lambda -> None { ask_shortcut("What is at risk?"); }}><UiIcon name="shield-check" /><span><strong>Check my risks</strong><small>Review deadlines and dependencies</small></span><UiIcon name="arrow-up-right" /></button>
-                    <button className="command-suggestion" type="button" onClick={lambda -> None { ask_shortcut("Can I finish everything today?"); }}><UiIcon name="chart-no-axes-combined" /><span><strong>Check my capacity</strong><small>See what fits in this day</small></span><UiIcon name="arrow-up-right" /></button>
+                    <button className="command-suggestion" type="button" onClick={lambda -> None { ask_shortcut("How much capacity do I have?"); }}><UiIcon name="chart-no-axes-combined" /><span><strong>Check my capacity</strong><small>See what fits in this day</small></span><UiIcon name="arrow-up-right" /></button>
                     <button className="command-suggestion" type="button" onClick={lambda -> None { ask_shortcut("Help me adjust my plan"); }}><UiIcon name="calendar-days" /><span><strong>Adjust my plan</strong><small>Explore a change before approving it</small></span><UiIcon name="arrow-up-right" /></button>
-                </div><small className="suggestion-help">Suggestions fill your message. You decide when to send.</small></aside>
-                <CommandPanel view_board={view_board} questions={command_questions} answers={command_answers} command_query={command_query} busy={busy} live_connected={live_connected} speech={speech} onQuery={lambda (query: str) -> None { command_query = query; }} run_command={run_command} open_workspace={open_workspace} accept_cmd_proposal={accept_cmd_proposal} dismiss_cmd_proposal={dismiss_cmd_proposal} />
-                <aside className="command-sidebar"><section className="studio-card command-date-card"><time dateTime={selected_day}>{outlook_date_label(selected_day, True) + ", " + outlook_date_label(selected_day)}</time><form onSubmit={open_day}><label htmlFor="command-day" className="sr-only">Planning date</label><input id="command-day" type="date" required={True} value={selected_day} onChange={lambda (e: ChangeEvent) { selected_day = e.target.value; }}/><button className="button secondary" type="submit" disabled={busy}>Open day</button></form></section>
+                </div><small className="suggestion-help">These four suggestions work without Gemini. They fill your message; you decide when to send.</small></aside>
+                <CommandPanel view_board={view_board} questions={command_questions} answers={command_answers} sources={command_sources} onOfflineHelp={lambda -> None { explanation_dialog = "offline"; }} command_query={command_query} busy={busy} live_connected={live_connected} speech={speech} onQuery={lambda (query: str) -> None { command_query = query; }} run_command={run_command} open_workspace={open_workspace} accept_cmd_proposal={accept_cmd_proposal} dismiss_cmd_proposal={dismiss_cmd_proposal} />
+                <aside className="command-sidebar"><section className="studio-card command-date-card"><time dateTime={selected_day}>{outlook_date_label(selected_day, True) + ", " + outlook_date_label(selected_day)}</time><form onSubmit={open_day}><label htmlFor="command-day" className="sr-only">Planning date</label><input id="command-day" type="date" required={True} value={planning_day_input} onChange={lambda (e: ChangeEvent) { planning_day_input = e.target.value; }}/><button className="button secondary" type="submit" disabled={busy}>Open day</button></form></section>
                     <section className="studio-card command-context-card"><span className="eyebrow">YOUR PLAN, CONNECTED</span><div className="command-plan-metrics"><div><strong>{remaining}</strong><span>open tasks</span></div><div><strong>{duration_label(view_board.briefing.health.available_minutes)}</strong><span>available</span></div></div><div className="command-context-next"><span>YOUR NEXT STEP</span><h2>{view_board.briefing.next_action.title}</h2><button className="explanation-link" type="button" onClick={lambda -> None { explanation_dialog = "next"; }}>Why this step?</button></div>{secretary_last_run and <button className="explanation-link" type="button" onClick={lambda -> None { explanation_dialog = "run"; }}>How your secretary checked this</button>}<button className="card-link" type="button" onClick={lambda -> None { open_page("today"); }}>Open Today<UiIcon name="arrow-right" /></button><p className="command-approval-note"><UiIcon name="shield-check" />You review and approve changes.</p></section>
                 </aside>
             </div>}
-            {active_page == "today" and <div className={"page-view page-today " + ("tour-focus" if tour_step == 0 else "")}>
+            {active_page == "today" and <div className="page-view page-today">
             <div id="today" className="studio-grid">
                 <div className="studio-column studio-left">
                     <PlanningCalendar planner_month={planner_month} selected_day={selected_day} busy={busy} month_busy={month_busy} month_error={month_error} load_month={load_month} switch_day={switch_day} open_page={open_page} open_workspace={open_workspace} ask_shortcut={ask_shortcut} />
@@ -702,14 +740,14 @@ def:pub Planner(onSignOut: any) -> JsxElement {
                 </div>
                 <div className="studio-column studio-center">
                     <CompanionVisual working={busy} />
-                    <section className="studio-card assistant-overview" aria-labelledby="next-step-title"><div className="card-kicker"><h2 id="next-step-title">YOUR NEXT STEP</h2><UiIcon name="layers" /></div><h3>{view_board.briefing.next_action.title}</h3><button className="explanation-link" type="button" onClick={lambda -> None { explanation_dialog = "next"; }}>Why this step?</button><button className="button primary" type="button" onClick={lambda -> None { ask_shortcut(); }}><UiIcon name="message-circle" />Open Command</button><div className="overview-shortcuts"><button type="button" onClick={lambda -> None { ask_shortcut("What is at risk?"); }}>Check risks</button><button type="button" onClick={lambda -> None { ask_shortcut("Can I finish everything today?"); }}>Check capacity</button></div>{len(view_board.command_proposals) > 0 and <button className="card-link" type="button" onClick={lambda -> None { ask_shortcut(); }}>{str(len(view_board.command_proposals)) + " proposals to review"}<UiIcon name="chevron-right" /></button>}</section>
+                    <section className="studio-card assistant-overview" aria-labelledby="next-step-title"><div className="card-kicker"><h2 id="next-step-title">YOUR NEXT STEP</h2><UiIcon name="layers" /></div><h3>{view_board.briefing.next_action.title}</h3><button className="explanation-link" type="button" onClick={lambda -> None { explanation_dialog = "next"; }}>Why this step?</button><button className="button primary" type="button" onClick={lambda -> None { ask_shortcut(); }}><UiIcon name="message-circle" />Open Command</button><div className="overview-shortcuts"><button type="button" onClick={lambda -> None { ask_shortcut("What is at risk?"); }}>Check risks</button><button type="button" onClick={lambda -> None { ask_shortcut("How much capacity do I have?"); }}>Check capacity</button></div>{len(view_board.command_proposals) > 0 and <button className="card-link" type="button" onClick={lambda -> None { ask_shortcut(); }}>{str(len(view_board.command_proposals)) + " proposals to review"}<UiIcon name="chevron-right" /></button>}</section>
 
 
 
                 </div>
                 <div className="studio-column studio-right">
                     <section className="studio-card health-panel" aria-labelledby="health-heading"><div className="card-kicker"><h2 id="health-heading">YOUR DAY AT A GLANCE</h2><UiIcon name="chart-no-axes-combined" /></div><div className="health-headline"><div><strong>{duration_label(-view_board.briefing.health.slack_minutes) if view_board.briefing.health.slack_minutes < 0 else duration_label(view_board.briefing.health.slack_minutes)}</strong><span>{"over available time" if view_board.briefing.health.slack_minutes < 0 else "room in your plan"}</span></div><CapacityOrbit pressure={view_board.briefing.health.pressure_percent} no_time={view_board.briefing.health.available_minutes == 0 and view_board.briefing.health.required_minutes > 0} /></div><div className="capacity-track" role="progressbar" aria-label="Planning pressure" aria-valuetext={duration_label(view_board.briefing.health.required_minutes) + " needed; " + duration_label(view_board.briefing.health.available_minutes) + " available"} aria-valuemin="0" aria-valuemax="100" aria-valuenow={min(100, view_board.briefing.health.pressure_percent)}><span style={pressure_style(view_board.briefing.health.pressure_percent)}></span></div><div className="capacity-caption"><span>{duration_label(view_board.briefing.health.required_minutes)} needed</span><span>{duration_label(view_board.briefing.health.available_minutes)} available</span></div><div className="health-counters"><div><strong>{remaining}</strong><span>open tasks</span></div><div><strong>{placed}</strong><span>scheduled</span></div><div><strong>{view_board.briefing.completed_tasks}</strong><span>completed</span></div></div><p className="health-summary-label">{view_board.briefing.health.label}</p><button className="explanation-link" type="button" onClick={lambda -> None { explanation_dialog = "health"; }}>Why this assessment?</button></section>
-            <section className="section-grid timeline-section">
+            <section id="timeline" className="section-grid timeline-section">
                 <div className="panel timeline-panel studio-card">
                     <div className="panel-heading"><div><span className="eyebrow">TODAY’S SCHEDULE</span><h2>Room for what matters</h2></div><span className="legend">Fixed / Flexible</span></div>
                     <div className="timeline-list">
@@ -747,7 +785,7 @@ def:pub Planner(onSignOut: any) -> JsxElement {
                 <section className="studio-card connection-panel" aria-labelledby="connections-title"><div className="card-kicker"><h2 id="connections-title">YOUR CONNECTED SPACE</h2><UiIcon name="link" /></div>
                     <div className="connection-row"><UiIcon name="calendar-days" /><span>Web planner</span><strong>Saved plan</strong></div>
                     <div className="connection-row"><UiIcon name="terminal" /><span>Terminal</span><strong>Shared account</strong></div>
-                    <button type="button" className="card-link" onClick={lambda -> None { open_page("settings"); }}>Manage connections <UiIcon name="chevron-right" /></button>
+                    <button type="button" className="card-link" onClick={lambda -> None { choose_settings("connections"); open_page("settings"); }}>Manage connections <UiIcon name="chevron-right" /></button>
                 </section>
                 <section id="goals" className="goals-section studio-card">
                     <div className="goals-heading"><div><span className="eyebrow">YOUR GOALS</span><h2>The bigger picture</h2></div></div>
@@ -756,7 +794,7 @@ def:pub Planner(onSignOut: any) -> JsxElement {
                             <div className="goal-info">
                                 <strong>{goal.title}</strong>
                                 <span className="goal-pill">{"Priority: " + str(goal.importance)}</span>
-                                <span className="goal-pill">{"Target: " + goal.target_date}</span>
+                                <span className="goal-pill">{"Target: " + day_label(goal.target_date)}</span>
                             </div>
                             <div className="goal-progress-bar">
                                 <span style={{"width": str(goal.completed_tasks * 100 // max(1, goal.total_tasks)) + "%"}}></span>
@@ -770,12 +808,12 @@ def:pub Planner(onSignOut: any) -> JsxElement {
                     </div>
                     <button className="button secondary goal-launcher" type="button" onClick={lambda -> None { notice = ""; goal_dialog_open = True; }}><UiIcon name="plus" />Add a goal</button>
                 </section>
-                <section className="activity-section studio-card" aria-labelledby="activity-title">
+                <section id="activity" className="activity-section studio-card" aria-labelledby="activity-title">
                     <div className="activity-heading"><div><span className="eyebrow">WHY THE PLAN CHANGED</span><h2 id="activity-title">Planning activity</h2></div><span>{str(len(view_board.activities))} recent changes</span></div>
                     <div id="planning-activity-list" className="activity-list" role="region" aria-label="Recent planning changes" tabIndex={0}>
                         {[<article className="activity-item" key={activity.id}>
                             <span className="activity-marker" aria-hidden="true"></span>
-                            <div><strong>{activity.title}</strong><p>{activity.detail}</p><small>{activity.day} | {activity.created_at.replace("T", " ")}</small></div>
+                            <div><strong>{activity.title}</strong><p>{activity.detail}</p><small>{day_label(activity.day)} | {day_label(activity.created_at[:10]) + " " + activity.created_at[11:]}</small></div>
                         </article> for activity in view_board.activities]}
                         {len(view_board.activities) == 0 and <p className="empty-state">Accepted changes will appear here with a short explanation.</p>}
                     </div>
@@ -803,31 +841,31 @@ def:pub Planner(onSignOut: any) -> JsxElement {
 
 </div>
             </div>}
-            {active_page == "capture" and <section id="capture" className={"page-view page-capture " + ("tour-focus" if tour_step == 1 else "")}>
+            {active_page == "capture" and <section id="capture" className="page-view page-capture">
                 <div className="capture-column capture-page-grid">
-                    <div className="panel form-panel"><span className="eyebrow">QUICK CAPTURE</span><h2>What needs doing?</h2>
+                    <div id="task-capture-card" className="panel form-panel"><span className="eyebrow">QUICK CAPTURE</span><h2>What needs doing?</h2>
                         <form onSubmit={save_task}>
-                            <label htmlFor="task-title">Task</label><input id="task-title" required={True} value={title} placeholder="Read chapter four" onChange={lambda (e: ChangeEvent) { title = e.target.value; }}/>
-                            <div className="field-pair"><div><label htmlFor="duration">Minutes</label><input id="duration" type="number" min="15" max="600" step="15" value={str(duration)} onChange={lambda (e: ChangeEvent) { duration = int(e.target.value); }}/></div>
-                            <div><label htmlFor="deadline">Done by</label><input id="deadline" type="time" value={deadline} onChange={lambda (e: ChangeEvent) { deadline = e.target.value; }}/></div></div>
-                            <label htmlFor="task-due-day">Due date (optional)</label><input id="task-due-day" type="date" min={selected_day} value={task_due_day} onChange={lambda (e: ChangeEvent) { task_due_day = e.target.value; }}/>
-                            <p className="form-note">Leave this blank if the task is due on the planning date. A later due date allows a safe move to another day.</p>
+                            <label htmlFor="task-title">Task</label><input id="task-title" required={True} value={title} placeholder="Prepare the weekly report" onChange={lambda (e: ChangeEvent) { title = e.target.value; }}/>
+                            <div className="field-pair"><div><label htmlFor="duration">Duration · minutes</label><input id="duration" required={True} type="number" min="15" max="600" step="15" value={str(duration)} onChange={lambda (e: ChangeEvent) { duration = int(e.target.value) if e.target.value else 0; }}/></div>
+                            <div><label htmlFor="deadline">Done by</label><input id="deadline" required={True} type="time" value={deadline} onChange={lambda (e: ChangeEvent) { deadline = e.target.value; }}/></div></div>
+                            <label htmlFor="task-due-day">Due date (optional)</label><input id="task-due-day" aria-describedby="task-due-context" type="date" min={selected_day} value={task_due_day} onChange={lambda (e: ChangeEvent) { task_due_day = e.target.value; }}/>
+                            <p id="task-due-context" className="date-context">Due {day_label(task_due_day or selected_day)}</p><p className="form-note">Leave this blank if the task is due on the planning date. A later due date allows a safe move to another day.</p>
                             <label htmlFor="preferred">Best time (optional)</label><input id="preferred" type="time" value={preferred} onChange={lambda (e: ChangeEvent) { preferred = e.target.value; }}/>
                             <label htmlFor="priority">Priority</label><select id="priority" value={str(priority)} onChange={lambda (e: ChangeEvent) { priority = int(e.target.value); }}><option value="1">Low</option><option value="2">Normal</option><option value="3">High</option></select>
-                            <button className="button primary full" type="submit" disabled={busy}>Add task <span>→</span></button>
+                            <div className="capture-summary"><strong>{day_label(selected_day)}</strong><span>{str(duration)} minutes · Due {clock_time(time_minutes(deadline)) if deadline else "Choose a time"}</span></div><button className="button primary full" type="submit" disabled={busy}>Add task <span>→</span></button>
                         </form>
                     </div>
-                    <div className="panel form-panel"><span className="eyebrow">CAN’T MOVE</span><h2>Fixed commitment</h2>
+                    <div id="fixed-capture-card" className="panel form-panel"><span className="eyebrow">CAN’T MOVE</span><h2>Fixed commitment</h2>
                         <form onSubmit={save_fixed}>
-                            <label htmlFor="fixed-title">Event</label><input id="fixed-title" required={True} value={fixed_title} placeholder="Lecture, lab or appointment" onChange={lambda (e: ChangeEvent) { fixed_title = e.target.value; }}/>
-                            <div className="field-pair"><div><label htmlFor="fixed-start">Starts</label><input id="fixed-start" type="time" value={fixed_start} onChange={lambda (e: ChangeEvent) { fixed_start = e.target.value; }}/></div>
-                            <div><label htmlFor="fixed-end">Ends</label><input id="fixed-end" type="time" value={fixed_end} onChange={lambda (e: ChangeEvent) { fixed_end = e.target.value; }}/></div></div>
-                            <button className="button secondary full" type="submit" disabled={busy}>Add commitment</button>
+                            <label htmlFor="fixed-title">Event</label><input id="fixed-title" required={True} value={fixed_title} placeholder="Meeting, appointment or family commitment" onChange={lambda (e: ChangeEvent) { fixed_title = e.target.value; }}/>
+                            <div className="field-pair"><div><label htmlFor="fixed-start">Starts</label><input id="fixed-start" required={True} type="time" value={fixed_start} onChange={lambda (e: ChangeEvent) { fixed_start = e.target.value; }}/></div>
+                            <div><label htmlFor="fixed-end">Ends</label><input id="fixed-end" required={True} type="time" value={fixed_end} onChange={lambda (e: ChangeEvent) { fixed_end = e.target.value; }}/></div></div>
+                            <div className="capture-summary"><strong>{day_label(selected_day)}</strong><span>{fixed_start}–{fixed_end} · Fixed time</span></div><button className="button secondary full" type="submit" disabled={busy}>Add commitment</button>
                         </form>
                     </div>
                 </div>
             </section>}
-            {active_page == "settings" and <section id="settings" className={"settings-page page-view " + ("tour-focus" if tour_step == 3 else "")}>
+            {active_page == "settings" and <section id="settings" className="settings-page page-view">
                 <aside className="settings-sidebar" aria-label="Settings navigation">
                     <div className="settings-sidebar-title"><UiIcon name="settings-2" /><strong>Settings</strong></div>
                     <p className="settings-sidebar-copy">A space that works for you.</p>
@@ -887,7 +925,7 @@ def:pub Planner(onSignOut: any) -> JsxElement {
                                             })}
                                             <button className="button secondary" type="button" disabled={calendar_busy} onClick={lambda -> None { calendar_operation("select"); return; }}>Save calendar selection</button>
                                         </fieldset>
-                                        <div><h3>2. Review busy time</h3><p className="connection-help">{"Preview seven days from " + selected_day + ". Nothing is imported without approval. Unplaced work stays saved and is shown in the review."}</p><button className="button secondary" type="button" disabled={calendar_busy or calendar_state.selected.length == 0} onClick={lambda -> None { calendar_operation("import"); return; }}>Synchronize now: preview imports</button></div>
+                                        <div><h3>2. Review busy time</h3><p className="connection-help">{"Preview seven days from " + day_label(selected_day) + ". Nothing is imported without approval. Unplaced work stays saved and is shown in the review."}</p><button className="button secondary" type="button" disabled={calendar_busy or calendar_state.selected.length == 0} onClick={lambda -> None { calendar_operation("import"); return; }}>Synchronize now: preview imports</button></div>
                                         <fieldset><legend>3. Export selected tasks</legend><p className="connection-help">Only unfinished, scheduled tasks are eligible. Checked tasks are previewed first. Exported tasks are never read back as new commitments.</p>
                                             {not calendar_state.app_calendar and <button className="button secondary" type="button" disabled={calendar_busy} onClick={lambda -> None { calendar_operation("create"); return; }}>Create dedicated Replaniva calendar</button>}
                                             {calendar_state.app_calendar and <p className="connection-help">Your app-created Replaniva calendar is ready. An existing personal calendar cannot be selected as the destination.</p>}
@@ -910,24 +948,27 @@ def:pub Planner(onSignOut: any) -> JsxElement {
                     </div>
                 </div>
             </section>}
-            {active_page == "recovery" and <section id="recovery" className={"recovery-section page-view " + ("tour-focus" if tour_step == 2 else "")}>
+            {active_page == "recovery" and <section id="recovery" className="recovery-section page-view">
                 <div className="recovery-heading"><div><span className="eyebrow">SIGNATURE WORKFLOW / SIMULATION MODE</span><h2>Recovery Studio<span className="brand-dot">.</span></h2><p>Test a disruption without changing your saved plan. See the ripple, compare valid options, then choose your next move.</p></div><span className="recovery-symbol" aria-hidden="true">↝</span></div>
-                <div className="ai-capture"><div><label htmlFor="change-note">Describe the change in your own words <span>· Model optional</span></label><input id="change-note" value={change_note} placeholder="My lab moved to 2–5 pm today" onChange={lambda (e: ChangeEvent) { change_note = e.target.value; }}/></div><button className="button secondary" type="button" disabled={busy} onClick={lambda -> None { interpret_change(); return; }}>Interpret note</button></div>
+                <div id="recovery-capture-card" className="recovery-capture-card"><div className="workflow-step"><span>01</span><div><h3>Describe the interruption</h3><p>{day_label(selected_day)} · Planning hours {clock_time(view_board.day_start)}–{clock_time(view_board.day_end)}</p></div></div><div className="ai-capture"><div><label htmlFor="change-note">Describe the change in your own words <span>· Model optional</span></label><input id="change-note" value={change_note} placeholder="My meeting moved to 2–3 pm" onChange={lambda (e: ChangeEvent) { change_note = e.target.value; }}/></div><button className="button secondary" type="button" disabled={busy} onClick={lambda -> None { interpret_change(); return; }}>Interpret note</button></div>
                 <label className="model-opt-in"><input type="checkbox" checked={model_schedule} onChange={lambda -> None { model_schedule = not model_schedule; }}/> Include a model-assisted alternative (uses your allowance)</label>
                 <form className="disruption-form" onSubmit={report_change}>
-                    <div><label htmlFor="disruption">What happened?</label><input id="disruption" required={True} value={disruption} placeholder="Unexpected lab" onChange={lambda (e: ChangeEvent) { disruption = e.target.value; }}/></div>
-                    <div><label htmlFor="disrupted-start">Starts</label><input id="disrupted-start" type="time" value={disrupted_start} onChange={lambda (e: ChangeEvent) { disrupted_start = e.target.value; }}/></div>
-                    <div><label htmlFor="disrupted-end">Ends</label><input id="disrupted-end" type="time" value={disrupted_end} onChange={lambda (e: ChangeEvent) { disrupted_end = e.target.value; }}/></div>
+                    <div><label htmlFor="disruption">What happened?</label><input id="disruption" required={True} value={disruption} placeholder="Unexpected meeting" onChange={lambda (e: ChangeEvent) { disruption = e.target.value; }}/></div>
+                    <div><label htmlFor="disrupted-start">Starts</label><input id="disrupted-start" required={True} type="time" value={disrupted_start} onChange={lambda (e: ChangeEvent) { disrupted_start = e.target.value; }}/></div>
+                    <div><label htmlFor="disrupted-end">Ends</label><input id="disrupted-end" required={True} type="time" value={disrupted_end} onChange={lambda (e: ChangeEvent) { disrupted_end = e.target.value; }}/></div>
                     <button className="button primary" type="submit" disabled={busy}>Explore recovery <span>↝</span></button>
-                </form>
-                {proposal and <div className="proposal-area">
-                    <div className="proposal-intro"><div><span className="eyebrow">SIMULATED PLAN / REVIEW BEFORE APPLYING</span><h3>{proposal.title} changes your day</h3><p>{clock_time(proposal.start)}–{clock_time(proposal.end)} is held for your new commitment. Your current plan stays in place until you accept a choice.</p></div><button className="dismiss-button" type="button" disabled={busy} onClick={lambda -> None { dismiss(proposal_id); return; }}>Discard simulation</button></div>
+                    <p className="recovery-form-note">Preview only. Your saved plan stays unchanged until you accept a choice.</p>
+                </form></div>
+                <div id="recovery-comparison"><div className="workflow-step"><span>02</span><div><h3>Review your choices</h3><p>Compare the impact, then decide what to apply.</p></div></div>
+                {not proposal and <div className="recovery-empty"><UiIcon name="shield-check"/><h3>Your saved plan is protected</h3><p>Complete the interruption form to compare two validated alternatives here.</p></div>}{proposal and <div className="proposal-area">
+                    <div className="proposal-intro"><div><span className="eyebrow">SIMULATED PLAN / REVIEW BEFORE APPLYING</span><h3>{proposal.title} changes your day</h3><p>{day_label(selected_day)} · {clock_time(proposal.start)}–{clock_time(proposal.end)} is held for your new commitment. Your current plan stays in place until you accept a choice.</p></div><button className="dismiss-button" type="button" disabled={busy} onClick={lambda -> None { dismiss(proposal_id); return; }}>Discard simulation</button></div>
                     <div className="option-grid">
                         <article className="option-card"><div className="option-head"><span>OPTION 01</span><h3>Move as little as possible</h3></div><OptionCard choice={proposal.minimal} tasks={view_board.tasks} commitments={view_board.commitments} change_title={proposal.title} change_start={proposal.start} change_end={proposal.end} day_start={view_board.day_start} day_end={view_board.day_end}/><button className="button secondary full" type="button" disabled={busy} onClick={lambda -> None { choose(proposal_id, "minimal"); return; }}>Accept this plan</button></article>
                         <article className="option-card featured"><div className="option-head"><span>OPTION 02</span><h3>Protect deadlines</h3></div><OptionCard choice={proposal.deadline} tasks={view_board.tasks} commitments={view_board.commitments} change_title={proposal.title} change_start={proposal.start} change_end={proposal.end} day_start={view_board.day_start} day_end={view_board.day_end}/><button className="button primary full" type="button" disabled={busy} onClick={lambda -> None { choose(proposal_id, "deadline"); return; }}>Accept this plan</button></article>
                     </div>
                     {same_plan(proposal.minimal, proposal.deadline) and <p className="same-plan">Both approaches lead to the same valid schedule today.</p>}
                 </div>}
+                </div>
                 {[<div className="restore-bar" key={revision.id}>
                     <span>{"Restored recovery: " if revision.restored else "Accepted recovery: "}<strong>{revision.title}</strong></span>
                     {not revision.restored and <button type="button" onClick={lambda -> None { restore(revision.id); return; }}>Restore previous plan</button>}
@@ -943,9 +984,10 @@ def:pub Planner(onSignOut: any) -> JsxElement {
                         <select id="goal-importance" value={goal_importance} onChange={lambda (e: ChangeEvent) { goal_importance = e.target.value; }}><option value="low">Low</option><option value="medium">Medium</option><option value="high">High</option></select>
                         <div className="modal-actions"><button className="button secondary" type="button" onClick={lambda -> None { goal_dialog_open = False; }}>Cancel</button><button type="submit" className="button primary" disabled={busy}>Save goal</button></div>
                     </form></WorkspaceDialog>}
-            {explanation_dialog and <WorkspaceDialog dialog_id="explanation-dialog" title={"Why this step?" if explanation_dialog == "next" else "Why this assessment?" if explanation_dialog == "health" else "Secretary activity"} onClose={lambda -> None { explanation_dialog = ""; }}>
+            {explanation_dialog and <WorkspaceDialog dialog_id="explanation-dialog" title={"Why this step?" if explanation_dialog == "next" else "Why this assessment?" if explanation_dialog == "health" else "Offline planning help" if explanation_dialog == "offline" else "Secretary activity"} onClose={lambda -> None { explanation_dialog = ""; }}>
                 {explanation_dialog == "next" and <p>{view_board.briefing.next_action.reason}</p>}
                 {explanation_dialog == "health" and <div><p>{view_board.briefing.summary}</p><ul>{[<li key={reason}>{reason}</li> for reason in view_board.briefing.health.reasons]}</ul></div>}
+                {explanation_dialog == "offline" and <div className="offline-help"><p>These requests use your saved plan and work without Gemini or another model:</p><ul><li>What should I do next?</li><li>What is at risk?</li><li>How much capacity do I have?</li><li>Explain my plan</li><li>Help me adjust my plan</li><li>Show my dependencies or my goal progress</li></ul><p>Recovery time fields, capture and scheduling also work without a model. Free-form requests outside the supported patterns may need model interpretation. If it is unavailable, the secretary gives verified plan findings and asks for a clearer request. It does not pretend to understand or apply a change.</p></div>}
                 {explanation_dialog == "run" and secretary_last_run and <div><p>{secretary_last_run.source}</p><ol>{[<li key={str(index)}>{secretary_last_run.steps[index]}</li> for index in range(len(secretary_last_run.steps))]}</ol></div>}
             </WorkspaceDialog>}
             {calendar_review_open and calendar_preview and calendar_preview.ok and <WorkspaceDialog dialog_id="calendar-review-dialog" title="Review Calendar changes" onClose={lambda -> None { calendar_review_open = False; }}><section className="calendar-review" aria-labelledby="calendar-review-heading">{calendar_feedback and <p className="calendar-feedback" role="status">{calendar_feedback}</p>}<h3 id="calendar-review-heading">{"Review " + calendar_preview.mode + " changes"}</h3>
@@ -955,7 +997,8 @@ def:pub Planner(onSignOut: any) -> JsxElement {
                                     <div className="calendar-actions"><button className="button primary" type="button" disabled={calendar_busy} onClick={lambda -> None { calendar_operation("approve"); return; }}>Approve these changes</button><button className="button secondary" type="button" disabled={calendar_busy} onClick={lambda -> None { calendar_operation("dismiss"); return; }}>Leave unchanged</button></div>
                                 </section></WorkspaceDialog>}
             {breakdown_proposal is not None and <BreakdownDialog breakdown_proposal={breakdown_proposal} busy={busy} breakdown_error={breakdown_error} cancel_breakdown={cancel_breakdown} change_breakdown_title={change_breakdown_title} change_breakdown_duration={change_breakdown_duration} remove_breakdown_step={remove_breakdown_step} confirm_breakdown={confirm_breakdown} />}
-            {tour_step >= 0 and <GuidedTour tour_step={tour_step} narration_supported={speech.narration_supported} tour_audio={tour_audio} speaking={speech.speaking} tour_key={tour_key} close_tour={close_tour} speak_tour={speak_tour} previous_tour_step={previous_tour_step} next_tour_step={next_tour_step} />}
+            {tour_step >= 0 and <GuidedTour placement={tour_placement} highlight={tour_highlight} tour_step={tour_step} narration_supported={speech.narration_supported} tour_audio={tour_audio} speaking={speech.speaking} tour_key={tour_key} close_tour={close_tour} speak_tour={speak_tour} previous_tour_step={previous_tour_step} next_tour_step={next_tour_step} />}
+            {planning_date_open and <WorkspaceDialog dialog_id="planning-date-dialog" title="Choose planning day" focus_id="planning-day" onClose={lambda -> None { if not busy { planning_date_open = False; planning_day_input = selected_day; } }}><form className="planning-date-form" onSubmit={open_day}><label htmlFor="planning-day">Planning date</label><input id="planning-day" type="date" required={True} aria-describedby="planning-day-context" value={planning_day_input} onChange={lambda (e: ChangeEvent) { planning_day_input = e.target.value; }}/><p id="planning-day-context" className="date-context" aria-live="polite">{day_label(planning_day_input) if planning_day_input else "Choose a date"}</p><div className="modal-actions"><button type="button" className="button secondary" disabled={busy} onClick={lambda -> None { planning_date_open = False; planning_day_input = selected_day; }}>Cancel</button><button type="submit" className="button primary" disabled={busy}>Open day</button></div></form></WorkspaceDialog>}
             <footer>REPLANIVA / PLANS THAT ADAPT WHEN LIFE CHANGES</footer>
         </main>
     </div>;

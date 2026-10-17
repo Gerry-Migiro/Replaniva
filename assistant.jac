@@ -533,7 +533,8 @@ def capacity_command(context: CommandContext) -> CommandReply | None {
 
 def recovery_command(context: CommandContext) -> CommandReply | None {
     normalized = context.normalized;
-    if "lost" in normalized or "changed" in normalized or "disruption" in normalized {
+    if "lost" in normalized or "changed" in normalized or "disruption" in normalized or
+       "adjust my plan" in normalized or "replan" in normalized {
         return CommandReply(ok=True, kind="recovery", title="Let's protect the rest of the day",
             message="Open Recovery Studio to enter the time you lost. Replaniva will simulate valid choices before changing the saved plan.",
             action_label="Open Recovery Studio", action_target="recovery");
@@ -544,7 +545,9 @@ def recovery_command(context: CommandContext) -> CommandReply | None {
 def briefing_command(context: CommandContext) -> CommandReply | None {
     normalized = context.normalized;
     briefing = context.briefing;
-    if "brief" in normalized or "summary" in normalized or "today" in normalized {
+    if "brief" in normalized or "summary" in normalized or "today" in normalized or
+       "explain my plan" in normalized or "explain the plan" in normalized or
+       "how does my day look" in normalized {
         return CommandReply(ok=True, kind="briefing", title=briefing.headline,
             message=briefing.summary, action_label="Review today's plan",
             action_target="today");
