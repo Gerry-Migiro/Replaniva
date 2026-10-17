@@ -257,7 +257,6 @@ def:pub Planner(onSignOut: any) -> JsxElement {
     }
     useSecretaryLive(refresh_live, lambda (connected: bool) -> None { live_connected = connected; }, live_ready);
     async can with entry {
-        await refresh();
         if "calendar_return=1" in window.location.search {
             active_page = "settings";
             settings_section = "connections";
@@ -265,15 +264,20 @@ def:pub Planner(onSignOut: any) -> JsxElement {
                 win: any = window;
                 stored: str = win.sessionStorage.getItem("replaniva-calendar") or "null";
                 pending: any = JSON.parse(stored);
-                win.sessionStorage.removeItem("replaniva-calendar");
-                if pending {
+                params: any = new(win.URLSearchParams, win.location.search);
+                callback_ok = params.get("calendar_callback") == "1";
+                if not callback_ok {
+                    calendar_feedback = "Google Calendar authorization did not complete. Start the connection again.";
+                } elif pending {
                     outcome: Action = await calendar_finish(authorization_id=pending.flow, proof=pending.proof);
                     calendar_feedback = outcome.message;
+                    if outcome.ok { win.sessionStorage.removeItem("replaniva-calendar"); }
                 } else { calendar_feedback = "No connection was started in this browser tab. Connect Calendar again."; }
             } except Exception { calendar_feedback = "The connection could not be finished. Sign in to the account that started it and reconnect."; }
             window.history.replaceState(None, "", "/");
             await load_calendar();
         }
+        await refresh();
     }
 
     async def load_calendar() -> None {
@@ -924,6 +928,7 @@ def:pub Planner(onSignOut: any) -> JsxElement {
                                     <div className="calendar-actions">
                                         <button className="button secondary" type="button" disabled={calendar_busy or not calendar_state.configured} onClick={lambda -> None { connect_calendar(); return; }}>{"Reconnect" if calendar_state.connected else "Connect Google Calendar"}</button>
                                         <button className="button secondary" type="button" disabled={calendar_busy} onClick={lambda -> None { load_calendar(); return; }}>Refresh status</button>
+                                        {calendar_state.configured and <button className="button secondary" type="button" disabled={calendar_busy} onClick={lambda -> None { calendar_operation("disconnect"); return; }}>Disconnect Google Calendar</button>}
                                     </div>
                                     {calendar_state.connected and <div className="calendar-steps">
                                         <fieldset><legend>1. Choose calendars to read</legend><p className="connection-help">We will only read these calendars. The Replaniva export calendar is excluded.</p>
@@ -942,7 +947,6 @@ def:pub Planner(onSignOut: any) -> JsxElement {
                                         </fieldset>
                                         <p className="connection-help">{"Last successful synchronization: " + calendar_state.last_sync if calendar_state.last_sync else "No synchronization approved yet."}</p>
                                     </div>}
-                                    {calendar_state.configured and <button className="button secondary" type="button" disabled={calendar_busy} onClick={lambda -> None { calendar_operation("disconnect"); return; }}>Disconnect Google Calendar</button>}
                                 </div>}
                                 {calendar_preview and calendar_preview.ok and <button className="button secondary" type="button" onClick={lambda -> None { calendar_review_open = True; }}>Review pending Calendar changes</button>}
                             </article>

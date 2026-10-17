@@ -31,9 +31,22 @@ with entry {
 }
 """Safe owner-facing error with no upstream response or credentials."""
 class CalendarError(ValueError) {}
+def callback_return_url(connected: bool) -> str {
+    configured = os.environ.get("REPLANIVA_WEB_URL", "").strip();
+    if not configured {
+        redirect = urllib.parse.urlsplit(os.environ.get("GOOGLE_CALENDAR_REDIRECT_URI", "http://localhost:8001" + CALLBACK_PATH));
+        configured = "http://localhost:8000" if redirect.hostname == "localhost" and redirect.port == 8001 else "http://127.0.0.1:8000" if redirect.hostname == "127.0.0.1" and redirect.port == 8001 else redirect.scheme + "://" + redirect.netloc;
+    }
+    parsed = urllib.parse.urlsplit(configured);
+    if not parsed.hostname or parsed.username or parsed.password or parsed.query or parsed.fragment or parsed.path not in ("", "/") or (parsed.scheme != "https" and not (parsed.scheme == "http" and parsed.hostname in ("localhost", "127.0.0.1"))) {
+        raise CalendarError("Set REPLANIVA_WEB_URL to the application's HTTPS origin, or its local development origin.");
+    }
+    return configured.rstrip("/") + "/?calendar_return=1&calendar_callback=" + ("1" if connected else "0");
+}
+
 def configuration() -> any {
     redirect = os.environ.get(
-        "GOOGLE_CALENDAR_REDIRECT_URI", ("http://localhost:8100" + CALLBACK_PATH)
+        "GOOGLE_CALENDAR_REDIRECT_URI", ("http://localhost:8001" + CALLBACK_PATH)
     );
     parsed = urllib.parse.urlsplit(redirect);
     if (
@@ -245,6 +258,7 @@ def http_json(
 @serialized
 def begin(account: any) -> dict[(str, str)] {
     (client, _, redirect, _) = configuration();
+    web = urllib.parse.urlsplit(callback_return_url(True));
     vault = Vault();
     (state, proof, verifier) = (
         secrets.token_urlsafe(32),
@@ -290,9 +304,9 @@ def begin(account: any) -> dict[(str, str)] {
         "flow": state,
         "proof": proof,
         "origin": (
-            urllib.parse.urlsplit(redirect).scheme
+            web.scheme
             + "://"
-            + urllib.parse.urlsplit(redirect).netloc
+            + web.netloc
         )
     };
 }

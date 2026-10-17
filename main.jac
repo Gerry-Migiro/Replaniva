@@ -1,6 +1,8 @@
 """Replaniva web entry: private planning API and client application."""
 
 import from http { HTTPMethod }
+import json;
+import html;
 import calendar_gateway as google;
 
 import ".styles.css";
@@ -15,8 +17,9 @@ def:pub app -> JsxElement {
 @restspec(method=HTTPMethod.GET, path="/integrations/google-calendar/callback", produces="text/html", envelope=False)
 def:pub google_calendar_callback(code: str = "", state: str = "", error: str = "") -> str {
     # This public facade cannot read or write the private Jac planning graph.
-    google.callback(code, state, error);
-    return "<!doctype html><html lang='en'><head><meta charset='utf-8'><meta name='referrer' content='no-referrer'><meta http-equiv='Content-Security-Policy' content=\"default-src 'none'; script-src 'unsafe-inline'; base-uri 'none'; form-action 'none'\"><title>Return to Replaniva</title></head><body><p>Return to Replaniva to finish connecting Calendar.</p><a href='/'>Return to Replaniva</a><script>history.replaceState(null,'','/');location.replace('/?calendar_return=1');</script></body></html>";
+    connected = google.callback(code, state, error);
+    target = google.callback_return_url(bool(connected));
+    return "<!doctype html><html lang='en'><head><meta charset='utf-8'><meta name='referrer' content='no-referrer'><meta http-equiv='Content-Security-Policy' content=\"default-src 'none'; script-src 'unsafe-inline'; base-uri 'none'; form-action 'none'\"><title>Return to Replaniva</title></head><body><p>Return to Replaniva to finish connecting Calendar.</p><a href='" + html.escape(target, quote=True) + "'>Return to Replaniva</a><script>location.replace(" + json.dumps(target).replace("<", "\\u003c") + ");</script></body></html>";
 }
 
 # User-owned secretary runtime, shared by the existing interface modules.

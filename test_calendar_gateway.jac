@@ -192,6 +192,21 @@ class CalendarTests(unittest.TestCase) {
             }
         }
     }
+    def test_callback_return_uses_web_origin_and_exact_result(self: CalendarTests) -> any {
+        with patch.dict(os.environ, {"REPLANIVA_WEB_URL": "http://localhost:8000/"}) {
+            self.assertEqual(g.begin(self.account)["origin"], "http://localhost:8000");
+            self.assertEqual(g.callback_return_url(True), "http://localhost:8000/?calendar_return=1&calendar_callback=1");
+            self.assertEqual(g.callback_return_url(False), "http://localhost:8000/?calendar_return=1&calendar_callback=0");
+        }
+        with patch.dict(os.environ, {"REPLANIVA_WEB_URL": "", "GOOGLE_CALENDAR_REDIRECT_URI": "https://planner.example" + g.CALLBACK_PATH}) {
+            self.assertEqual(g.callback_return_url(True), "https://planner.example/?calendar_return=1&calendar_callback=1");
+        }
+        for origin in ["javascript:alert(1)", "https://user:secret@planner.example", "https://planner.example/?code=secret", "http://planner.example", "https://planner.example/path"] {
+            with patch.dict(os.environ, {"REPLANIVA_WEB_URL": origin}) {
+                with self.assertRaises(g.CalendarError) { g.callback_return_url(True); }
+            }
+        }
+    }
     def event(self: CalendarTests, **extra: any) -> any {
         return {
             "id": "class-a",

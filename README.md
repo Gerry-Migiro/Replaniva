@@ -138,6 +138,8 @@ No model key is required for deterministic planning or structured recovery. Opti
 
 Google Calendar requires separate owner setup and consent. Live synchronization has not been verified.
 
+For local Calendar authorization, register `http://localhost:8001/integrations/google-calendar/callback` as the Google web client's redirect URI and set `REPLANIVA_WEB_URL=http://localhost:8000`. Open the app at that same web origin before connecting so the private authorization proof remains in the original browser tab. On a hosted app, use its HTTPS callback URL and set `REPLANIVA_WEB_URL` to the public app origin. Keep the client secret and Calendar encryption key in server environment variables. Select calendars to read, preview imports, then approve them. Exports require a dedicated app-created Replaniva calendar and a separate preview and approval.
+
 ## Architecture
 
 - `planning.jac` creates and validates deterministic schedules.
@@ -172,7 +174,7 @@ Model and Calendar tests use synthetic replies rather than live external calls. 
 
 ## Hosting
 
-The current [Jac Hammer preview](https://preview-jac-sbx-7e2689ce011c41e89ec82551f99699e8.jachammer.app/) is a temporary sandbox. Hosted workflows still need verification after the runtime and client compilation errors are resolved. Configure production authentication and persistent storage before a production release. Keep secrets, runtime storage and caches out of Git. The bundled admin portal is disabled in `jac.toml`.
+The current [Jac Hammer preview](https://preview-jac-sbx-f8b7149b41a44ce1b83812205a496474.jachammer.app/) is a temporary sandbox. Live signup, capture, planning questions, recovery approval and saved state after reload have been checked. Google Calendar authorization and synchronization still require configured deployment credentials and live verification. Configure production authentication and persistent storage before a production release. Keep secrets, runtime storage and caches out of Git. The bundled admin portal is disabled in `jac.toml`.
 
 ## Dashboard appearance and visual assets
 

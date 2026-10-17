@@ -445,7 +445,9 @@ html:has(.command-workspace),body:has(.command-workspace) { height:100%; overflo
 .settings-panel .calendar-check>span { min-width:0; overflow-wrap:anywhere; }
 .check-copy { display:grid; gap:4px; }
 .check-copy small { color:var(--muted); font-size:12px; line-height:1.5; font-weight:400; }
-.settings-panel .calendar-actions { gap:10px; }
+.settings-panel .calendar-actions { display:flex; flex-wrap:wrap; align-items:center; gap:12px; margin:12px 0 16px; }
+.settings-panel .calendar-actions + .calendar-steps,
+.settings-panel .calendar-steps + .calendar-actions { margin-top:20px; }
 .model-opt-in { display:flex; align-items:center; gap:12px; min-height:44px; font-size:14px; line-height:1.5; }
 @media(max-width:760px) {
 
