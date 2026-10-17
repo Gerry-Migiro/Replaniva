@@ -66,6 +66,9 @@ enabled = true
 [serve.access_log]
 enabled = false
 
+[serve.compression]
+enabled = false
+
 [serve.websocket]
 allowed_origins = ["http://localhost:8000", "http://127.0.0.1:8000", "https://preview-jac-sbx-502b88fe495449528b3cd21fedf641ef.jachammer.app", "https://preview-jac-sbx-7e2689ce011c41e89ec82551f99699e8.jachammer.app"]
 
