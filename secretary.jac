@@ -128,8 +128,8 @@ def sync_planning_graph() -> list[str] {
     if errors { return errors; }
     for task in tasks {
         if not task.relationships_migrated {
-            del [edge task ->:DependsOn:->];
-            del [edge task ->:SupportsGoal:->];
+            for linked_task in list([task ->:DependsOn:->]) { task del --> linked_task; }
+            for linked_goal in list([task ->:SupportsGoal:->]) { task del --> linked_goal; }
             for dependency in tasks {
                 if jid(dependency) in task.depends_on { task +>: DependsOn :+> dependency; }
             }

@@ -4,6 +4,12 @@
 
 Replaniva is a private personal planner built around recovery. When a new commitment disrupts a day, it shows what is affected, prepares validated alternatives, explains the tradeoffs, and changes the saved plan only after approval.
 
+## Try Replaniva
+
+- [Live application](https://preview-jac-sbx-f8b7149b41a44ce1b83812205a496474.jachammer.app/)
+- [Watch the narrated demo](https://youtu.be/0KcTfdmqosw)
+- Choose **Try the demo** on the sign-in screen to explore the shared sample account, or create your own private account. Demo changes are visible to other visitors; use your own account for personal information and Calendar connections.
+
 ## Why it stands out
 
 - **Recovery Studio:** Compare the current day with two valid recovery choices: move as little as possible or protect deadlines.

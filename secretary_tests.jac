@@ -42,6 +42,15 @@ test "secretary migrates relationships idempotently and traverses real graph cha
         assert sync_planning_graph() == [];
         assert len([second ->:DependsOn:->]) == 1;
         assert len([first ->:SupportsGoal:->]) == 1;
+        replacement = root ++> PlanningGoal(title="Develop confidence");
+        first.goal_id = jid(replacement);
+        first.relationships_migrated = False;
+        assert sync_planning_graph() == [];
+        assert [jid(item) for item in [first ->:SupportsGoal:->]] == [jid(replacement)];
+        first.goal_id = jid(goal);
+        first.relationships_migrated = False;
+        assert sync_planning_graph() == [];
+        assert len([first ->:SupportsGoal:->]) == 1;
         result = investigate("What should I do next?", "2099-01-01", [], 480, 1320, 3);
         assert set(result.visited_tasks) == {jid(first), jid(second)};
         assert result.visited_goals == [jid(goal)];
@@ -80,6 +89,11 @@ test "secretary reminders are deduplicated snoozable and reconcile completion" {
         assert len(notices) == 1;
         assert change_notification(jid(notices[0]), "snooze", 15).ok;
         assert notices[0].snoozed_until > time.time();
+        assert not any(item.id == jid(notices[0]) for item in notifications());
+        secretary_tick(stamp + 1);
+        assert not any(item.id == jid(notices[0]) for item in notifications());
+        notices[0].snoozed_until = time.time() - 1;
+        assert any(item.id == jid(notices[0]) for item in notifications());
         assert not change_notification("foreign", "dismiss").ok;
         task.done = True;
         secretary_tick(stamp + 60);

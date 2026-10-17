@@ -28,7 +28,7 @@ def login_name(value: str) -> str {
 
 def:pub ClientApp -> JsxElement {
     has signed_in: bool = jacIsLoggedIn(), username: str = "", password: str = "",
-        registering: bool = False, auth_error: str = "";
+        registering: bool = False, auth_error: str = "", auth_busy: bool = False;
 
     useEffect(lambda {
         document.title = "Replaniva | Plans that adapt when life changes";
@@ -45,6 +45,7 @@ def:pub ClientApp -> JsxElement {
 
     async def authenticate(e: FormEvent) -> None {
         e.preventDefault();
+        if auth_busy { return; }
         auth_error = "";
         if not login_name(username) or len(password) < 8 {
             auth_error = "Use a username of 3 to 32 letters, numbers, underscores or hyphens, and a password of at least eight characters.";
@@ -53,6 +54,7 @@ def:pub ClientApp -> JsxElement {
         signup: SignupResult | None = None;
         ok: bool = False;
         identity = {"type": "username", "value": login_name(username)};
+        auth_busy = True;
         try {
             if registering {
                 signup = await jacSignup([identity], password);
@@ -66,7 +68,19 @@ def:pub ClientApp -> JsxElement {
             else { auth_error = "Those details did not work. Please try again."; }
         } except Exception {
             auth_error = "Connection failed. Please try again.";
-        }
+        } finally { auth_busy = False; }
+    }
+
+    async def sign_in_demo() -> None {
+        if auth_busy { return; }
+        auth_busy = True;
+        auth_error = "";
+        try {
+            ok = await jacLogin({"type": "username", "value": "replaniva"}, "12345678");
+            if ok { signed_in = True; }
+            else { auth_error = "The demo account is unavailable. You can create your own account instead."; }
+        } except Exception { auth_error = "The demo could not connect. Please try again."; }
+        finally { auth_busy = False; }
     }
 
     if signed_in {
@@ -109,8 +123,9 @@ def:pub ClientApp -> JsxElement {
                         required={True} value={password}
                         onChange={lambda (e: ChangeEvent) { password = e.target.value; }} placeholder="At least 8 characters" />
                     {auth_error and <p className="form-error" role="alert">{auth_error}</p>}
-                    <button className="button primary full" type="submit">{"Create account" if registering else "Sign in"}<span>→</span></button>
+                    <button className="button primary full" type="submit" disabled={auth_busy}>{"Signing in..." if auth_busy else "Create account" if registering else "Sign in"}<span>→</span></button>
                 </form>
+                <div className="auth-demo"><button className="button secondary full" type="button" disabled={auth_busy} onClick={lambda -> None { sign_in_demo(); return; }}>Try the demo</button><p className="muted">Shared sample account. Changes are visible to other demo users.</p></div>
                 <button className="text-button" type="button" onClick={lambda -> None { registering = not registering; auth_error = ""; }}>
                     {"Already have an account? Sign in" if registering else "New here? Create an account"}
                 </button>
@@ -153,11 +168,16 @@ def:pub Planner(onSignOut: any) -> JsxElement {
     selected_day_ref: any = useRef("");
     selected_day_ref.current = selected_day;
     notification_memory: any = useRef(None);
+    inbox_request: any = useRef(0);
+    notification_pending: any = useRef(False);
     alerts_enabled: any = useRef(False);
 
     async def load_inbox() -> None {
+        inbox_request.current += 1;
+        request_id = inbox_request.current;
         try {
             latest = await secretary_notifications();
+            if request_id != inbox_request.current { return; }
             previous: any = notification_memory.current;
             new_items = [item for item in latest if not item.read and item.browser_allowed and (previous is not None and item.id not in previous)];
             inbox = latest;
@@ -172,11 +192,18 @@ def:pub Planner(onSignOut: any) -> JsxElement {
 
 
     async def notification_action(id: str, action: str) -> None {
+        if notification_pending.current { return; }
+        notification_pending.current = True;
+        secretary_error = "";
         try {
-            result = await secretary_notification(notification_id=id, action=action);
-            if not result.ok { secretary_error = result.message; }
+            result = await secretary_notification(notification_id=id, action=action, minutes=15);
+            if not result.ok { secretary_error = result.message; return; }
+            inbox_request.current += 1;
+            if action in ["snooze", "dismiss"] { inbox = [item for item in inbox if item.id != id]; }
+            secretary_error = "Reminder snoozed for 15 minutes." if action == "snooze" else "Notification updated.";
             await load_inbox();
         } except Exception { secretary_error = "The notification could not be updated. Try again."; }
+        finally { notification_pending.current = False; }
     }
 
 

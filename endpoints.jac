@@ -1688,7 +1688,7 @@ def:protect secretary_runs() -> list[SecretaryRunView] {
 def:protect secretary_settings -> SecretaryPreferences { return secretary_config().view(); }
 def:protect secretary_notifications -> list[NotificationView] { return notifications(); }
 def:protect secretary_notification(notification_id: str, action: str, minutes: int = 15) -> SecretaryAction {
-    result = change_notification(notification_id, action, minutes);
+    result = change_notification(notification_id, action, int(minutes));
     if result.ok { notify_secretary_clients(); }
     return result;
 }
