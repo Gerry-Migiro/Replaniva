@@ -139,7 +139,7 @@ class UsageGuard {
                     or (recent >= limit("REPLANIVA_AI_RPM", 4))
                     or (
                         (recent_units + units)
-                        > limit("REPLANIVA_AI_MINUTE_UNITS", 12000)
+                        > limit("REPLANIVA_AI_MINUTE_UNITS", 45000)
                     )
                     or (active >= 1)
                 ) {

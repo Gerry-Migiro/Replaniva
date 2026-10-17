@@ -103,6 +103,13 @@ class UsageTests(unittest.TestCase) {
         self.now += 61;
         self.assertEqual(self.call(payload="second"), "answer");
     }
+    def test_default_allowance_completes_bounded_tool_sequence(self: UsageTests) -> any {
+        for step in range(4) {
+            self.assertEqual(self.call(payload=("x" * 7999) + str(step)), "answer");
+        }
+        self.assertIsNone(self.call(payload="extra", operation=lambda() { self.fail("RPM limit bypass"); }));
+        self.assertEqual(self.guard.status("alice")["calls"], 4);
+    }
     def test_failure_is_counted_and_cooldown_survives_restart(
         self: UsageTests
     ) -> any {

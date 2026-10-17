@@ -13,6 +13,14 @@ def ChatAvatar() -> JsxElement {
 }
 
 def:pub CommandPanel(view_board: Board, questions: list[str], answers: list[CommandReply], command_query: str, busy: bool, live_connected: bool, speech: SpeechSession, onQuery: any, run_command: any, open_workspace: any, accept_cmd_proposal: any, dismiss_cmd_proposal: any, sources: list[str] = [], onOfflineHelp: any = None) -> JsxElement {
+    def composer_key(event: any) -> None {
+        if event.key == "Enter" and not event.shiftKey and not event.nativeEvent.isComposing and event.keyCode != 229 {
+            event.preventDefault();
+            if not busy and not speech.listening and command_query.strip() {
+                event.currentTarget.form.requestSubmit();
+            }
+        }
+    }
     useEffect(lambda -> None {
         if len(answers) > 0 {
             thread: any = document.getElementById("command-conversation");
@@ -64,14 +72,14 @@ def:pub CommandPanel(view_board: Board, questions: list[str], answers: list[Comm
                             </div></div>
 <div className="command-composer">
                                 <label className="composer-label" htmlFor="plan-command">{"Live transcript, review before sending" if speech.listening else "Your message"}</label>
-                                <form onSubmit={run_command}>
+                                <form onSubmit={run_command} aria-busy={busy}>
                                     <div className="input-group">
-                                        <textarea id="plan-command" rows={2} value={command_query} maxLength={300} placeholder="Ask about your day, or use the microphone..." aria-describedby="command-input-help" onChange={lambda (e: ChangeEvent) { onQuery(e.target.value); }} />
+                                        <textarea id="plan-command" rows={2} value={command_query} disabled={busy} maxLength={300} placeholder="Ask about your day, or use the microphone..." aria-describedby="command-input-help" onKeyDown={composer_key} onChange={lambda (e: ChangeEvent) { onQuery(e.target.value); }} />
                                     </div>
                                     <button type="submit" disabled={busy or speech.listening or not command_query.strip()}><span className="sr-only">Send planning question</span><UiIcon name="arrow-up-right" /></button>
                                 </form>
                                 <VoicePanel listening={speech.listening} voice_supported={speech.supported} voice_error={speech.error} start_listening={speech.start} />
-                                <p id="command-input-help" className="command-input-help">Voice fills this message. Review it, then send when you are ready.</p>{onOfflineHelp and <button className="offline-help-button" type="button" onClick={onOfflineHelp}>What works without model assistance?</button>}
+                                <p id="command-input-help" className="command-input-help" aria-live="polite">{"Reviewing your message..." if busy else "Enter to send. Shift+Enter for a new line. Review voice input before sending."}</p>{onOfflineHelp and <button className="offline-help-button" type="button" onClick={onOfflineHelp}>What works without model assistance?</button>}
 
                             </div>
 

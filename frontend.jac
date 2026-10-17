@@ -624,6 +624,7 @@ def:pub Planner(onSignOut: any) -> JsxElement {
             command_questions = (command_questions + [submitted_query])[-20:];
             command_answers = (command_answers + [reply])[-20:];
             command_sources = (command_sources + [secretary_last_run.source])[-20:];
+            command_query = "";
         } except Exception { notice = "The secretary could not finish. Your saved plan was not changed."; busy = False; return; }
         if reply is not None and reply.proposal is not None {
             selected_day = reply.proposal.day;
