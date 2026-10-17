@@ -136,7 +136,11 @@ Open **Settings** to manage appearance, planning hours, assistant preferences an
 
 No model key is required for deterministic planning or structured recovery. Optional model assistance uses bounded provider calls and application allowances. If interpretation is unavailable, use the structured time fields. Configure provider credentials through deployment secrets or an excluded local environment file. Raw provider credentials are not accepted through browser forms.
 
-Google Calendar requires separate owner setup and consent. Live synchronization has not been verified.
+Google Calendar requires separate owner setup and consent. Real Google export and approved import have been verified locally, including imported appointments appearing in Today and the Mobile browser preview. Each hosted deployment still needs its own authorization and synchronization check.
+
+If the Google OAuth application is in Testing mode, only Google accounts listed under **Google Auth Platform → Audience → Test users** can authorize Calendar access. Add invited testers there, or provide a dedicated Replaniva demo account connected only to a demo calendar. A Replaniva login does not bypass Google's authorization requirements for a tester's own Google account. Public Google authorization may require production publishing and sensitive-scope verification. Never share a Google account password.
+
+Imports preview seven days from the selected planning date and require approval. Only selected calendars' busy events are imported; events marked Free, including many holiday entries, are skipped. The dedicated export calendar is excluded from import to prevent duplicate busy time.
 
 For local Calendar authorization, register `http://localhost:8001/integrations/google-calendar/callback` as the Google web client's redirect URI and set `REPLANIVA_WEB_URL=http://localhost:8000`. Open the app at that same web origin before connecting so the private authorization proof remains in the original browser tab. On a hosted app, use its HTTPS callback URL and set `REPLANIVA_WEB_URL` to the public app origin. Keep the client secret and Calendar encryption key in server environment variables. Select calendars to read, preview imports, then approve them. Exports require a dedicated app-created Replaniva calendar and a separate preview and approval.
 
@@ -170,7 +174,7 @@ jac build --as client Replaniva
 jac build mobile --platform web
 ```
 
-Model and Calendar tests use synthetic replies rather than live external calls. Compiler warnings remain visible.
+Automated model and Calendar regressions use synthetic replies. Separate browser checks exercised actual model responses and real Google Calendar import/export locally. Provider quotas can temporarily block optional model responses; deterministic planning remains available. Compiler warnings remain visible.
 
 ## Hosting
 
