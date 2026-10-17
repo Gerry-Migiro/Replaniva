@@ -181,6 +181,18 @@ test "private jobs register once and disabling removes their owned job" {
         assert manager.delete_job.call_args.kwargs["acting_as"] == "owner";
     }
 }
+test "enabling reminders replaces an owned job registered with the wrong target kind" {
+    import secretary_runtime;
+    import from unittest.mock { MagicMock, patch }
+    manager = MagicMock();
+    manager.list_jobs.return_value = ([{"name": "SecretaryTick", "job_id": "old", "is_walker": False}], 1);
+    manager.create_job.return_value = {"job_id": "new", "is_walker": True};
+    with patch.object(secretary_runtime, "scheduler_owner", return_value=(manager, "owner")) {
+        assert secretary_runtime.ensure_secretary_job("root", True) == "new";
+        manager.delete_job.assert_called_once_with("old", acting_as="owner");
+        assert manager.create_job.call_count == 1;
+    }
+}
 test "private live delivery never sends to another authenticated user" {
     import asyncio;
     import secretary_runtime;

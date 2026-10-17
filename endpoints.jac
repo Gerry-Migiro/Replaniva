@@ -1702,6 +1702,10 @@ def:protect secretary_update_settings(enabled: bool, timezone_name: str, morning
     import from zoneinfo { ZoneInfo }
     import from .secretary_runtime { ensure_secretary_job }
     require_account();
+    morning = int(morning);
+    quiet_start = int(quiet_start);
+    quiet_end = int(quiet_end);
+    lead = int(lead);
     try { ZoneInfo(timezone_name); }
     except Exception { return SecretaryAction(ok=False, message="Choose a valid IANA timezone, such as Africa/Nairobi."); }
     if min(morning, quiet_start, quiet_end) < 0 or max(morning, quiet_start, quiet_end) >= 1440 or lead not in [5, 15, 30, 60] {

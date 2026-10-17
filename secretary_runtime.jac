@@ -29,6 +29,13 @@ def _ensure_secretary_job(root_id: str, enabled: bool) -> str {
         for job in owned { scheduler.delete_job(str(job["job_id"]), acting_as=owner); }
         return "";
     }
+    # Older runtime registration could save this walker as a function job.
+    for job in owned {
+        if not job.get("is_walker", True) {
+            scheduler.delete_job(str(job["job_id"]), acting_as=owner);
+        }
+    }
+    owned = [job for job in owned if job.get("is_walker", True)];
     if owned {
         for job in owned[1:] { scheduler.delete_job(str(job["job_id"]), acting_as=owner); }
         return str(owned[0]["job_id"]);

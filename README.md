@@ -172,7 +172,7 @@ Model and Calendar tests use synthetic replies rather than live external calls. 
 
 ## Hosting
 
-The application is hosted on [Jac Hammer](https://preview-jac-sbx-502b88fe495449528b3cd21fedf641ef.jachammer.app/). Configure production authentication and persistent storage, then verify the hosted workflows. Keep secrets, runtime storage and caches out of Git. The bundled admin portal is disabled in `jac.toml`.
+The current [Jac Hammer preview](https://preview-jac-sbx-7e2689ce011c41e89ec82551f99699e8.jachammer.app/) is a temporary sandbox. Hosted workflows still need verification after the runtime and client compilation errors are resolved. Configure production authentication and persistent storage before a production release. Keep secrets, runtime storage and caches out of Git. The bundled admin portal is disabled in `jac.toml`.
 
 ## Dashboard appearance and visual assets
 

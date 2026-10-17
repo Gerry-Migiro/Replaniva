@@ -143,7 +143,7 @@ def:pub Planner(onSignOut: any) -> JsxElement {
         calendar_preview: CalendarPreview | None = None,
         secretary_last_run: SecretaryRunView | None = None,
         inbox: list[NotificationView] = [], inbox_open: bool = False, secretary_error: str = "",
-        live_connected: bool = False, goal_dialog_open: bool = False, explanation_dialog: str = "",
+        live_connected: bool = False, live_ready: bool = False, goal_dialog_open: bool = False, explanation_dialog: str = "",
         calendar_review_open: bool = False, planning_date_open: bool = False, planning_day_input: str = "", command_sources: list[str] = [];
     speech = useSpeech(lambda (text: str) -> None { command_query = text[:300]; });
     useEffect(lambda -> None {
@@ -238,6 +238,10 @@ def:pub Planner(onSignOut: any) -> JsxElement {
             session_error = "";
             load_error = "";
             await load_month(result.day);
+            if not live_ready {
+                await load_inbox();
+                live_ready = True;
+            }
         } except Exception as error {
             if request_id != board_request.current { return; }
             failure: any = error;
@@ -247,8 +251,11 @@ def:pub Planner(onSignOut: any) -> JsxElement {
         }
     }
 
-    useSecretaryLive(lambda -> None { load_inbox(); refresh(selected_day_ref.current); return; }, lambda (connected: bool) -> None { live_connected = connected; });
-    useEffect(lambda { load_inbox(); return; }, []);
+    async def refresh_live() -> None {
+        await refresh(selected_day_ref.current);
+        await load_inbox();
+    }
+    useSecretaryLive(refresh_live, lambda (connected: bool) -> None { live_connected = connected; }, live_ready);
     async can with entry {
         await refresh();
         if "calendar_return=1" in window.location.search {

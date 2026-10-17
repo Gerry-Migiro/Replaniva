@@ -4,8 +4,9 @@ import from react { useEffect }
 import from "@jac/runtime" { __getApiBaseUrl }
 import from endpoints { secretary_live_ticket }
 
-def:pub useSecretaryLive(onChange: any, onConnected: any) -> None {
+def:pub useSecretaryLive(onChange: any, onConnected: any, enabled: bool = True) -> None {
     useEffect(lambda {
+        if not enabled { return; }
         stopped = False;
         socket: any = None;
         retry: any = None;
@@ -49,5 +50,5 @@ def:pub useSecretaryLive(onChange: any, onConnected: any) -> None {
             if socket { socket.close(); }
             win.removeEventListener("focus", on_focus);
         };
-    }, []);
+    }, [enabled]);
 }

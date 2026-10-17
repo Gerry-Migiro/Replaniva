@@ -24,7 +24,7 @@ import from .secretary { secretary_config, private_account }
 import from .secretary_runtime { subscribe_account, check_owned_plan }
 
 @schedule(trigger=ScheduleTrigger.DYNAMIC)
-walker SecretaryTick {
+walker:protect SecretaryTick {
     can check with Root entry {
         cfg = secretary_config();
         if cfg.enabled { check_owned_plan(jid(root), cfg.job_id); }
