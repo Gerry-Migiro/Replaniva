@@ -34,6 +34,7 @@ obj SecretaryPreferences {
         quiet_start: int = 1320, quiet_end: int = 480, lead: int = 15,
         focus_period: str = "", job_id: str = "";
 }
+@archetype_alias("_jac_app_9919b86551cad1e0.secretary.SecretaryConfig")
 node SecretaryConfig {
     has enabled: bool = False, timezone: str = "Africa/Nairobi", morning: int = 480,
         quiet_start: int = 1320, quiet_end: int = 480, lead: int = 15,

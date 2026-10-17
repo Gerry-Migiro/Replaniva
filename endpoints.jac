@@ -135,6 +135,7 @@ obj BreakdownProposal {
 }
 
 @archetype_alias('jac:["Replaniva","endpoints"].PlanningSettings')
+@archetype_alias("_jac_app_9919b86551cad1e0.endpoints.Settings")
 node Settings(PlanningSettings) {
     has timezone: str = "", migration_complete: bool = False;
     static def __jac_schema__ -> None;
